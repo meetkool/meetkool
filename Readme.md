@@ -35,6 +35,9 @@ freejooo@nardcart:~$ cat projects-active
 ---
 
 <p align="right"> <img src="https://github.com/meetkool/meetkool/blob/master/images/resource/banner-img.svg" alt="meetkool" /> </p>
+    <p align="center">
+        <img src="https://github-profile-trophy.vercel.app/?username=arshiamidos&column=7&theme=onedark"/>
+    </p>
 <p align="center">→ ⛧ tech i use ✨ ←</p>
 
 <p align="center">
