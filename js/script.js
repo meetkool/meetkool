@@ -328,12 +328,12 @@
 	if($('#pagepiling').length) {
 	    $('#pagepiling').pagepiling({
 	        menu: '#menu',
-	        anchors: ['Home', 'About', 'Resume', 'Services','Portfolio','Contact'],
+	        anchors: ['Home', 'About', 'Resume', 'Services','Portfolio','Designs','Contact'],
 	        direction: 'vertical',
 	        keyboardScrolling:false,
 	        navigation: {
 	            'position': 'left',
-	            'tooltips': ['Home', 'About', 'Resume', 'Services', 'Portfolio','Contact']
+	            'tooltips': ['Home', 'About', 'Resume', 'Services', 'Portfolio','Designs','Contact']
 	        },
 	        
 	        afterLoad: function(anchorLink, index){
