@@ -169,11 +169,18 @@ a { color: inherit }
 [data-no] { transition: left .18s ease-out, top .18s ease-out }
 
 /* terminal */
-.term { min-height: 100%; padding: 10px 12px 16px; background: var(--term); color: var(--paper); font-family: var(--f-mono); font-size: 13px; line-height: 1.5; cursor: text }
+.term { min-height: 100%; display: flex; flex-direction: column; padding: 10px 12px 16px; background: var(--term); color: var(--paper); font-family: var(--f-mono); font-size: 13px; line-height: 1.5; cursor: text }
+.term-sugg { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: auto -12px -16px; padding: 10px 12px 12px; background: var(--term); border-top: 1px dashed #2c2f5e; cursor: default }
+.term-sugg > span { margin-right: 2px; color: var(--dim); font-size: 11.5px }
+.term-sugg button { padding: 4px 10px; background: transparent; color: var(--blue); border: 1px solid var(--blue); font-family: var(--f-mono); font-size: 12px; cursor: pointer }
+.term-sugg button:hover, .term-sugg button:focus-visible { background: var(--blue); color: var(--term) }
+.term-sugg button.danger { color: var(--hot); border-color: var(--hot) }
+.term-sugg button.danger:hover, .term-sugg button.danger:focus-visible { background: var(--hot); color: var(--term) }
+.term-sugg button:disabled { opacity: .4; cursor: default; background: transparent; color: var(--blue) }
 .ln { white-space: pre-wrap; overflow-wrap: anywhere }
 .ln a { color: var(--blue) }
 .t-p { color: var(--blue) } .t-h { color: var(--hot) } .t-g { color: var(--ok) } .t-y { color: var(--str) } .t-d { color: var(--dim) } .t-b { font-weight: 700 }
-.term-row { display: flex; gap: 8px; align-items: baseline }
+.term-row { display: flex; gap: 8px; align-items: baseline; margin-bottom: 14px }
 .term-row label { color: var(--blue); white-space: nowrap }
 .term-row input { flex: 1; min-width: 0; padding: 0; background: transparent; border: 0; outline: 0; color: var(--paper); font: inherit; caret-color: var(--hot) }
 .neo { display: flex; flex-wrap: wrap; gap: 4px 22px; align-items: flex-start; margin: 2px 0 6px }
@@ -527,6 +534,7 @@ const APPS = {
     <div class="term">
       <div class="term-out" aria-live="polite"></div>
       <form class="term-row" autocomplete="off"><label for="term-input">meet@nardcart:~$</label><input id="term-input" spellcheck="false" autocapitalize="off" autocomplete="off" enterkeyhint="go"></form>
+      <div class="term-sugg" role="group" aria-label="Suggested commands"><span>tap to run:</span>${SUGGEST.map(c => `<button type="button" data-cmd="${c}"${c.startsWith('rm') ? ' class="danger"' : ''}>${c}</button>`).join('')}</div>
     </div>`,
   mount(el) { mountTerminal(el); } },
 
@@ -775,11 +783,14 @@ let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(pai
 let T = null;
 const FILES = ['about.txt', 'books.md', 'contact.sh', 'DO_NOT_CLICK.exe', 'launch.sh', 'projects/', 'resume.log', 'services.cfg'];
 const OPENABLE = { about: 'about', 'about.txt': 'about', resume: 'resume', 'resume.log': 'resume', projects: 'projects', 'projects/': 'projects', services: 'services', 'services.cfg': 'services', contact: 'contact', 'contact.sh': 'contact', books: 'books', 'books.md': 'books', trash: 'trash', terminal: 'terminal' };
-const CMDS = ['help', 'whoami', 'neofetch', 'ls', 'cat', 'open', 'projects', 'resume', 'contact', 'books', 'tor', 'sl', 'launch', 'chaos', 'sudo', 'rm', 'reboot', 'clear', 'date', 'echo', 'history', 'exit', 'hire-meet'];
+const SUGGEST = ['about', 'resume', 'projects', 'services', 'contact', 'books', 'help', 'tor', 'launch', 'chaos', 'sudo hire-meet', 'rm -rf /'];
+const CMDS = ['help', 'whoami', 'neofetch', 'ls', 'cat', 'open', 'about', 'projects', 'resume', 'services', 'contact', 'books', 'trash', 'tor', 'sl', 'launch', 'chaos', 'sudo', 'rm', 'reboot', 'clear', 'date', 'echo', 'history', 'exit', 'hire-meet'];
 
 function mountTerminal(el) {
   const out = $('.term-out', el), input = $('#term-input', el), form = $('form', el), body = $('.win-body', el);
-  const hist = []; let hi = 0, busy = false;
+  const hist = []; let hi = 0, busy = false, typing = false;
+  const chips = $$('.term-sugg button', el);
+  const lock = on => { chips.forEach(b => { b.disabled = on; }); };
   const scroll = () => { body.scrollTop = body.scrollHeight; };
   const print = (html, cls = '') => { const d = document.createElement('div'); d.className = 'ln ' + cls; d.innerHTML = html; out.appendChild(d); scroll(); return d; };
   const run = async raw => {
@@ -787,8 +798,8 @@ function mountTerminal(el) {
     print(`<span class="t-p">meet@nardcart:~$</span> ${esc(raw)}`);
     if (!cmd) return;
     hist.push(cmd); hi = hist.length;
-    busy = true; input.disabled = true;
-    try { await exec(cmd, print, out); } finally { busy = false; if (T) { input.disabled = false; if (!narrow()) input.focus({ preventScroll: true }); } scroll(); }
+    busy = true; input.disabled = true; lock(true);
+    try { await exec(cmd, print, out); } finally { busy = false; lock(false); if (T) { input.disabled = false; if (!narrow()) input.focus({ preventScroll: true }); } scroll(); }
   };
   form.addEventListener('submit', e => { e.preventDefault(); if (busy) return; const v = input.value; input.value = ''; run(v); });
   input.addEventListener('keydown', e => {
@@ -803,15 +814,18 @@ function mountTerminal(el) {
       else if (hits.length > 1) print(hits.join('  '), 't-d');
     } else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); out.innerHTML = ''; }
   });
-  $('.term', el).addEventListener('click', () => { if (!getSelection().toString()) input.focus({ preventScroll: true }); });
+  $('.term', el).addEventListener('click', e => { if (!e.target.closest('.term-sugg, a, button') && !getSelection().toString()) input.focus({ preventScroll: true }); });
+  $('.term-sugg', el).addEventListener('click', e => { const b = e.target.closest('[data-cmd]'); if (b && T) T.auto(b.dataset.cmd, 32); });
   T = {
     print, out, hist,
-    async auto(text) {
-      if (busy) return;
+    async auto(text, speed = 55) {
+      if (busy || typing) return;
+      typing = true; lock(true);
       input.value = '';
-      for (const ch of text) { input.value += ch; await wait(reduced ? 0 : 55); }
-      await wait(reduced ? 0 : 180);
+      for (const ch of text) { input.value += ch; await wait(reduced ? 0 : speed); }
+      await wait(reduced ? 0 : 160);
       input.value = '';
+      typing = false;
       await run(text);
     }
   };
@@ -836,11 +850,12 @@ async function exec(cmd, print, out) {
     case 'help':
       print(`<div class="help">${[
         ['whoami', 'who is this'], ['neofetch', 'system info, but it\'s me'], ['ls', 'list files'], ['cat &lt;file&gt;', 'print a file (try books.md)'],
-        ['open &lt;app&gt;', 'about, resume, projects, services, contact, books, trash'], ['projects', 'list projects with links'],
+        ['about · resume · projects', 'open that window'], ['services · contact · books', 'open that window too'],
+        ['ls projects', 'list projects with links'], ['open &lt;app&gt;', 'about, resume, projects, services, contact, books, trash'],
         ['tor', 'build an onion circuit'], ['sl', 'you meant ls'], ['launch', 'go to space (life goal #1)'], ['chaos', 'you were warned'],
         ['sudo hire-meet', 'the correct answer'], ['rm -rf /', 'please don\'t'], ['reboot', 'boot again'], ['clear', 'clear the screen']
       ].map(([c, d]) => `<span class="t-y">${c}</span><span class="t-d">${d}</span>`).join('')}</div>`);
-      print('<span class="t-d">tab completes, ↑ ↓ for history.</span>');
+      print('<span class="t-d">tab completes, ↑ ↓ for history, or tap a command below.</span>');
       break;
     case 'whoami':
       print('meet bhanushali. os-dev, bare-metal, full stack, devops, blockchain. aiming for space.');
@@ -855,6 +870,10 @@ async function exec(cmd, print, out) {
       break;
     }
     case 'ls': {
+      if (args.some(a => a.replace(/\/$/, '') === 'projects')) {
+        [...PROJECTS, ...ACTIVE].forEach(p => print(`<span class="t-y">${esc(p.name.padEnd(24))}</span><span class="t-d">${esc(p.stack.padEnd(13))}</span>${ext(p.url, 'source ↗')}`));
+        break;
+      }
       const all = args.some(a => /^-\w*a/.test(a));
       const list = (all ? ['.', '..', '.secrets'] : []).concat(FILES);
       print(list.map(f => f.endsWith('/') ? `<span class="t-p t-b">${f}</span>` : f.endsWith('.exe') ? `<span class="t-h t-b">${f}</span>` : f.endsWith('.sh') ? `<span class="t-g t-b">${f}</span>` : f).join('  '));
@@ -882,9 +901,10 @@ async function exec(cmd, print, out) {
     case './contact.sh': openApp('contact'); print('running contact.sh…', 't-d'); break;
     case './launch.sh': case 'launch': print('T-minus 3… 2… 1…', 't-y'); await wait(reduced ? 0 : 500); launch(); break;
     case './DO_NOT_CLICK.exe': case 'chaos': print('you were warned.', 't-h'); openApp('uac'); break;
-    case 'projects':
-      [...ACTIVE, ...PROJECTS].forEach(p => print(`<span class="t-y">${esc(p.name.padEnd(24))}</span><span class="t-d">${esc(p.stack.padEnd(13))}</span>${ext(p.url, 'source ↗')}`));
-      break;
+    case 'about': openApp('about'); print('opening about.txt…', 't-d'); break;
+    case 'projects': openApp('projects'); print('opening ~/projects… (<span class="t-y">ls projects</span> lists them here)', 't-d'); break;
+    case 'services': openApp('services'); print('opening services.cfg…', 't-d'); break;
+    case 'trash': openApp('trash'); print('opening Trash…', 't-d'); break;
     case 'resume': openApp('resume'); print('opening resume.log…', 't-d'); break;
     case 'contact': openApp('contact'); print('opening contact.sh…', 't-d'); break;
     case 'books': openApp('books'); print('opening books.md…', 't-d'); break;
@@ -1249,7 +1269,7 @@ function startDesktop() {
   openApp('terminal', { at: () => [214, 26] });
   if (!narrow() && W >= 1000) openApp('about', { at: (W, H, w) => [Math.max(214 + 580 + 24, W - w - 48), 72] });
   focusWin('terminal');
-  if (T) T.auto('neofetch').then(() => T && T.print('type <span class="t-y">help</span> to see what this thing can do.', 't-d'));
+  if (T) T.auto('neofetch').then(() => T && T.print('type <span class="t-y">help</span>, or tap a command below.', 't-d'));
   clearTimeout(hireTimer);
   if (!ss.get('meetos-hire')) hireTimer = setTimeout(() => { if (!chaos && $('#space').hidden && $('#panic').hidden && $('#boot').hidden) { ss.set('meetos-hire', '1'); openApp('hire'); } }, 14000);
 }
