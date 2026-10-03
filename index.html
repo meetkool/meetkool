@@ -1,866 +1,1347 @@
-<!DOCTYPE html>
-<html lang="en" oncontextmenu="return!1">
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MeetOS 2026</title>
+<meta name="author" content="Meet Bhanushali">
+<meta name="description" content="Meet Bhanushali's portfolio, rebuilt as a bootable operating system.">
+<link rel="icon" href="images/icons/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=JetBrains+Mono:wght@400;700&family=VT323&display=swap">
+<style>
+/* Layout: a bootable OS. POST screen -> GRUB -> kernel log -> a desktop where every portfolio section is a draggable program window. */
+:root {
+  --ink: #10112a;        /* desktop */
+  --ink-2: #1b1d3f;      /* taskbar */
+  --paper: #f1f0fa;      /* window body */
+  --paper-2: #e1e0f3;    /* toolbars, chips */
+  --char: #151532;       /* window chrome, text on paper */
+  --muted: #55577f;      /* secondary text on paper */
+  --dim: #9a9cc8;        /* secondary text on ink */
+  --term: #0a0b1c;       /* terminal + code panes */
+  --blue: #149dcc;       /* the 2022 site's cursor colour */
+  --hot: #ff00a2;        /* the README's spotify bar */
+  --hot-ink: #c4007c;    /* hot pink, readable on paper */
+  --str: #ffd479;        /* strings in code panes */
+  --ok: #55ff55;
+  --cga-bg: #000000; --cga-fg: #aaaaaa; --cga-hi: #ffffff; --cga-yel: #ffff55; --cga-cyan: #55ffff; --cga-blue: #0000aa;
+  --f-display: "VT323", "Courier New", monospace;
+  --f-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --f-body: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --tb-h: 50px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { margin: 0; background: var(--ink); color: var(--paper); font-family: var(--f-body); overflow: hidden; -webkit-font-smoothing: antialiased }
+[hidden] { display: none !important }
+button { font: inherit; color: inherit }
+a { color: inherit }
+:focus-visible { outline: 2px solid var(--hot); outline-offset: 2px }
 
-<head>
-    <style type="text/css">
-        .custom-link {
-    display: inline-block;
-    border: 2px solid red;
-    padding: 10px;
-    transition: width 0.3s ease;
+/* ---------- desktop ---------- */
+#desk { position: fixed; left: 0; right: 0; top: env(safe-area-inset-top, 0px); bottom: calc(var(--tb-h) + env(safe-area-inset-bottom, 0px)); overflow: hidden }
+#wall { position: absolute; inset: 0; width: 100%; height: 100%; display: block }
+.hoodie { position: absolute; right: 2%; bottom: 0; height: min(90%, 760px); max-width: 60%; object-fit: contain; object-position: bottom right; pointer-events: none; user-select: none }
+.wall-name { position: absolute; left: 228px; bottom: 18px; display: flex; flex-direction: column; pointer-events: none; user-select: none }
+/* stroke first, then an ink fill on top: hides the variable font's overlapping contours */
+.wall-name span { font-family: var(--f-body); font-weight: 800; font-size: clamp(54px, 8.5vw, 132px); line-height: .84; letter-spacing: -.035em; color: var(--ink); -webkit-text-stroke: 3px var(--blue); paint-order: stroke fill }
+.wall-name small { margin-top: 12px; font-family: var(--f-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim) }
+#icons { position: absolute; top: 14px; left: 14px; bottom: 14px; display: grid; grid-auto-flow: column; grid-template-rows: repeat(auto-fill, 94px); grid-auto-columns: 92px; gap: 4px 6px; align-content: start }
+.icon { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 4px; background: none; border: 1px solid transparent; cursor: pointer; color: var(--paper); font-family: var(--f-mono); font-size: 11.5px; line-height: 1.2; text-align: center }
+.icon svg { width: 40px; height: 40px; flex: none; filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, .55)) }
+.icon span { text-shadow: 0 1px 2px #000; overflow-wrap: break-word }
+.icon:hover, .icon:focus-visible { background: rgba(20, 157, 204, .18); border-color: rgba(20, 157, 204, .65) }
+.icon.danger span { color: var(--hot) }
+#wins { position: absolute; inset: 0; pointer-events: none }
+#wins > * { pointer-events: auto }
+
+/* ---------- windows ---------- */
+.win { position: absolute; display: flex; flex-direction: column; background: var(--paper); color: var(--char); border: 2px solid var(--char); box-shadow: 8px 8px 0 var(--char); min-width: 260px; min-height: 150px; max-width: calc(100% - 16px); resize: both; overflow: hidden }
+.win.focused { box-shadow: 8px 8px 0 var(--blue) }
+.win.max { left: 8px !important; top: 8px !important; width: calc(100% - 16px) !important; height: calc(100% - 16px) !important; resize: none }
+.win-bar { flex: none; display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 5px 0 8px; background: var(--char); color: var(--paper); font-family: var(--f-mono); font-size: 12px; font-weight: 700; letter-spacing: .03em; cursor: grab; user-select: none; touch-action: none }
+.win-bar:active { cursor: grabbing }
+.win-bar svg { width: 18px; height: 18px; flex: none }
+.win-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.win:not(.focused) .win-title { color: var(--dim) }
+.win-btn { flex: none; width: 24px; height: 24px; padding: 0; display: grid; place-items: center; background: transparent; border: 1.5px solid var(--dim); color: var(--paper); font-family: var(--f-mono); font-size: 13px; line-height: 1; cursor: pointer }
+.win-btn:hover { border-color: var(--paper); background: rgba(241, 240, 250, .12) }
+.win-btn.x:hover { background: var(--hot); border-color: var(--hot) }
+.win-body { flex: 1; min-height: 0; overflow: auto; container-type: inline-size }
+
+/* prose windows */
+.doc { padding: 20px 24px 28px; max-width: 64ch; font-size: 15px; line-height: 1.55 }
+.kicker { margin: 0; font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted) }
+.doc h1 { margin: 6px 0 10px; font-weight: 800; font-size: clamp(30px, 9cqi, 46px); line-height: .95; letter-spacing: -.025em; text-wrap: balance }
+.doc h2 { margin: 24px 0 10px; font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase }
+.doc p { margin: 0 0 10px }
+.lede { font-size: 17px; line-height: 1.45 }
+.doc code, .tip code { font-family: var(--f-mono); font-size: .88em; background: var(--paper-2); padding: 1px 5px; border: 1px solid #c9c8e2 }
+.meters { display: grid; gap: 8px }
+.meter { display: grid; grid-template-columns: 104px minmax(0, 1fr) 42px; gap: 10px; align-items: center; font-family: var(--f-mono); font-size: 12px }
+.meter .bar { height: 14px; border: 1.5px solid var(--char); background: repeating-linear-gradient(90deg, var(--blue) 0 7px, transparent 7px 9px) 0 0 / var(--v) 100% no-repeat }
+.meter b { text-align: right; font-variant-numeric: tabular-nums }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px }
+.stat { border: 1.5px solid var(--char); padding: 8px 10px 10px; min-width: 0 }
+.stat b { display: block; font-family: var(--f-display); font-weight: 400; font-size: clamp(28px, 7.5cqi, 38px); line-height: .9; font-variant-numeric: tabular-nums }
+.stat span { font-size: 12.5px; line-height: 1.25; color: var(--muted) }
+.chips { display: flex; flex-wrap: wrap; gap: 6px }
+.stack-g { display: grid; gap: 10px }
+.stack-g > div { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; align-items: start }
+.stack-g h3 { margin: 4px 0 0; font-family: var(--f-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted) }
+@container (max-width: 400px) { .stack-g > div { grid-template-columns: 1fr; gap: 4px } }
+.doc .now { margin: 0 0 12px; padding: 8px 10px; border: 1.5px solid var(--char); background: var(--paper-2); font-family: var(--f-mono); font-size: 12.5px; line-height: 1.45 }
+.doc .now b { color: var(--hot-ink) }
+.chip { font-family: var(--f-mono); font-size: 11.5px; padding: 3px 8px; border: 1.5px solid var(--char); background: var(--paper-2) }
+.tip { margin-top: 20px !important; padding: 10px 12px; border: 1.5px dashed var(--muted); font-size: 14px }
+
+/* resume.log */
+.log { padding: 4px 16px 20px; font-family: var(--f-mono); font-size: 12.5px; line-height: 1.5 }
+.log-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; padding: 12px 0; border-bottom: 2px solid var(--char); color: var(--muted) }
+.log-head a { color: var(--char); font-weight: 700 }
+.log-row { display: grid; grid-template-columns: 19.5ch 62px minmax(0, 1fr); gap: 4px 12px; padding: 10px 0; border-bottom: 1px dashed #bdbcd8 }
+.ts { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap }
+.tag { align-self: start; text-align: center; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; padding: 1px 6px; border: 1.5px solid var(--char) }
+.tag.edu { background: var(--blue); color: var(--char) }
+.tag.work { background: var(--char); color: var(--paper) }
+.tag.build { background: var(--hot); color: var(--char) }
+.tag.lead, .tag.club, .tag.teach { background: var(--paper-2) }
+.log-row b { font-family: var(--f-body); font-size: 14.5px; font-weight: 800 }
+.log-row .role { color: var(--hot-ink); font-weight: 700 }
+.log-row p { margin: 2px 0 0; font-family: var(--f-body); font-size: 14px; line-height: 1.45 }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 0 2px }
+.log-row ul { margin: 4px 0 0; padding-left: 1.1em; font-family: var(--f-body); font-size: 14px; line-height: 1.45 }
+.log-row li + li { margin-top: 4px }
+.log-row a { color: var(--char); font-weight: 700 }
+.tag.achv { background: var(--str) }
+.log-sub { margin-top: 18px; padding-bottom: 8px; border-bottom: 2px solid var(--char); color: var(--muted) }
+.legend .tag { padding: 1px 6px }
+@container (max-width: 470px) {
+  .log-row { grid-template-columns: auto auto minmax(0, 1fr) }
+  .log-row > div { grid-column: 1 / -1 }
 }
 
+/* projects explorer */
+.ex-bar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; background: var(--paper-2); border-bottom: 2px solid var(--char); font-family: var(--f-mono); font-size: 12px }
+.ex-path { flex: 1 1 180px; min-width: 0; padding: 4px 8px; background: var(--paper); border: 1.5px solid var(--char); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.ex-bar a { font-weight: 700; text-decoration: none; padding: 4px 8px; border: 1.5px solid var(--char); background: var(--paper) }
+.ex-bar a:hover { background: var(--blue) }
+.ex-h { margin: 16px 14px 0; font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted) }
+.ex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; padding: 12px 14px 18px }
+.proj { display: flex; flex-direction: column; min-width: 0; border: 2px solid var(--char); background: var(--paper); transition: transform .15s, box-shadow .15s }
+.proj:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--hot) }
+.thumb { aspect-ratio: 16 / 10; max-width: 100%; display: grid; place-items: center; overflow: hidden; background: var(--term); border-bottom: 2px solid var(--char); color: var(--blue); font-family: var(--f-display); font-size: 24px; padding: 0 12px; text-align: center; overflow-wrap: anywhere }
+.thumb i { font-style: normal; color: var(--hot); animation: blink 1s steps(1) infinite }
+@keyframes blink { 50% { opacity: 0 } }
+.thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top left; display: block }
+.meta { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px 12px }
+.meta h3 { margin: 0; font-family: var(--f-mono); font-size: 13.5px; overflow-wrap: anywhere }
+.meta p { margin: 0; font-size: 13.5px; line-height: 1.4; color: var(--muted) }
+.meta .stack { align-self: flex-start; font-family: var(--f-mono); font-size: 10.5px; font-weight: 700; padding: 1px 6px; background: var(--char); color: var(--paper) }
+.meta .src { margin-top: auto; padding-top: 8px; border-top: 1.5px dashed #bdbcd8; font-family: var(--f-mono); font-size: 12px; font-weight: 700; text-decoration: none }
+.meta .src:hover { color: var(--hot-ink) }
+.meta span.src { color: var(--muted); font-weight: 400 }
 
-        
-        </style>
-    <meta name="author" content="Meet Bhanushali">
-    <meta charset="utf-8">
-    <title>Meet Bhanushali</title>
-    <link href="css/bootstrap.min.css" rel="stylesheet">
-    <link href="css/jquery.pagepiling.min.css" rel="stylesheet">
-    <link href="css/style.min.css" rel="stylesheet">
-    <link href="css/responsive.min.css" rel="stylesheet">
-    <link href="css/cursor.min.css" rel="stylesheet">
-    <link rel="shortcut icon" href="images\icons\favicon.ico" type="image/x-icon">
-    <link rel="icon" href="images\icons\favicon.ico" type="image/x-icon">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=0">
-</head>
+/* code panes: services.cfg, contact.sh */
+.code { min-height: 100%; padding: 12px 0 18px; background: var(--term); color: var(--paper); font-family: var(--f-mono); font-size: 13px; line-height: 1.6; counter-reset: ln }
+.cl { display: grid; grid-template-columns: 3.4em minmax(0, 1fr); padding-right: 14px }
+.cl::before { counter-increment: ln; content: counter(ln); padding-right: 1.1em; text-align: right; color: #4b4d7c; user-select: none }
+.cl > span { white-space: pre-wrap; overflow-wrap: anywhere }
+.k-c { color: var(--dim); font-style: italic }
+.k-s { color: var(--blue); font-weight: 700 }
+.k-k { color: var(--hot) }
+.k-v { color: var(--str) }
+.k-ok { color: var(--ok) }
+.code a { color: var(--str) }
+.copy { margin-left: 8px; padding: 0 6px; font-family: var(--f-mono); font-size: 11px; background: transparent; color: var(--blue); border: 1px solid var(--blue); cursor: pointer; vertical-align: 1px }
+.copy:hover { background: var(--blue); color: var(--term) }
 
-<body style="-moz-user-select:none;-webkit-user-select:none;-ms-user-select:none;user-select:none;-o-user-select:none"
-    unselectable="on" onselectstart="return!1">
-    <div class="cursor"></div>
-    <div class="preloader">
-        <div class="preloader_inner">0%</div>
-        <div class="loader-bar"></div>
-    </div>
-    <div class="page-wrapper">
-        <header class="main-header">
-            <div class="main-box">
-                <div class="logo"><a href="index.html"><img src="images/logo.png" alt="" title="" class="logo-light">
-                        <img src="images/logo-dark.png" alt="" title="" class="logo-dark"></a></div>
-            </div>
-        </header>
-<!-- done -->
-        <section class="sidenav-bar">
-            <div class="menu-backdrop"></div>
-            <div class="nav-box">
-                <div class="inner-box">
-                    <div class="upper-box">
-                        <div class="btn-box" style="cursor:none"><button class="nav-toggler" style="cursor:none"><span
-                                    class="flaticon-close-1" style="cursor:none"></span></button></div>
-                    </div>
-                    <nav class="side-nav">
-                        <ul class="navigation" id="menu">
-                            <li data-menuanchor="Home"><a href="#Home">Home</a></li>
-                            <li data-menuanchor="About"><a href="#About">About</a></li>
-                            <li data-menuanchor="Resume"><a href="#Resume">Resume</a></li>
-                            <li data-menuanchor="Services"><a href="#Services">Services</a></li>
-                            <li data-menuanchor="Portfolio"><a href="#Portfolio">Portfolio</a></li>
-                            <li data-menuanchor="Contact"><a href="#Contact">Contact</a></li>
+/* books + trash */
+.books { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px }
+.books li { display: grid; grid-template-columns: 3.2ch minmax(0, 1fr); gap: 8px; font-size: 14.5px; line-height: 1.4 }
+.books li > span:first-child { font-family: var(--f-mono); font-weight: 700; color: var(--hot-ink) }
+.books a { font-weight: 600 }
+.books em { font-style: normal; color: var(--muted) }
+.trash { list-style: none; margin: 0; padding: 0; font-family: var(--f-mono); font-size: 12.5px }
+.trash li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px dashed #bdbcd8 }
+.trash .sz { color: var(--muted); font-variant-numeric: tabular-nums }
+.trash button, .trash a.restore { justify-self: start; padding: 0; background: none; border: 0; font: inherit; font-weight: 700; color: var(--char); text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 3px }
+.trash-status { margin: 0; padding: 10px 14px 14px; font-family: var(--f-mono); font-size: 12px; color: var(--hot-ink); min-height: 2.6em }
 
-                            <li ><a href="#">Blogs</a></li>
-                            <li ><a href="https://almeet.000webhostapp.com/blog/">Posts Random links</a></li>
-                            <li ><a href="https://sokka.io/">Sokka Project</a></li>
-                            <li ><a href="">Nardcart Project</a></li>
-                            <li ><a href="">links </a></li>
-                        </ul>
-                    </nav>
-                    <div class="bottom-box">
-                        <div class="copyright-text">2022 | &copy; <a href="https://github.com/meetkool"
-                                target="_blank">Meet Bhanushali</a>.</div>
-                        <ul class="social-icon-one">
-                            <li><a href="https://keybase.io/doomlol" target="_blank"><span
-                                        class="fab fa-keybase"></span></a></li>
-                            <li><a href="https://github.com/meetkool" target="_blank"><span 
-                                class="fab fa-github"></span></a></li>
-                            <li><a href="http://git.meetssh.ml" target="_blank"><span 
-                                class="fab fa-git"></span></a></li>
-                                        
-                            <li><a href="https://linkedin.com/in/meet-bhanushali-b69606229/" target="_blank"><span
-                                        class="fab fa-linkedin"></span></a></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </section>
+/* dialogs */
+.dlg { position: relative; min-height: 100%; padding: 18px 18px 20px; display: flex; flex-direction: column; gap: 14px }
+.dlg p { margin: 0; font-size: 15.5px; line-height: 1.4 }
+.dlg .fine { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted) }
+.dlg-btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto }
+.btn { padding: 8px 16px; font-family: var(--f-mono); font-size: 13px; font-weight: 700; background: var(--blue); color: var(--char); border: 2px solid var(--char); box-shadow: 3px 3px 0 var(--char); cursor: pointer; white-space: nowrap }
+.btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--char) }
+.btn.ghost { background: var(--paper) }
+.btn.hot { background: var(--hot) }
+[data-no] { transition: left .18s ease-out, top .18s ease-out }
 
-        <!-- done -->
+/* terminal */
+.term { min-height: 100%; display: flex; flex-direction: column; padding: 10px 12px 16px; background: var(--term); color: var(--paper); font-family: var(--f-mono); font-size: 13px; line-height: 1.5; cursor: text }
+.term-sugg { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: auto -12px -16px; padding: 10px 12px 12px; background: var(--term); border-top: 1px dashed #2c2f5e; cursor: default }
+.term-sugg > span { margin-right: 2px; color: var(--dim); font-size: 11.5px }
+.term-sugg button { padding: 4px 10px; background: transparent; color: var(--blue); border: 1px solid var(--blue); font-family: var(--f-mono); font-size: 12px; cursor: pointer }
+.term-sugg button:hover, .term-sugg button:focus-visible { background: var(--blue); color: var(--term) }
+.term-sugg button.danger { color: var(--hot); border-color: var(--hot) }
+.term-sugg button.danger:hover, .term-sugg button.danger:focus-visible { background: var(--hot); color: var(--term) }
+.term-sugg button:disabled { opacity: .4; cursor: default; background: transparent; color: var(--blue) }
+.ln { white-space: pre-wrap; overflow-wrap: anywhere }
+.ln a { color: var(--blue) }
+.t-p { color: var(--blue) } .t-h { color: var(--hot) } .t-g { color: var(--ok) } .t-y { color: var(--str) } .t-d { color: var(--dim) } .t-b { font-weight: 700 }
+.term-row { display: flex; gap: 8px; align-items: baseline; margin-bottom: 14px }
+.term-row label { color: var(--blue); white-space: nowrap }
+.term-row input { flex: 1; min-width: 0; padding: 0; background: transparent; border: 0; outline: 0; color: var(--paper); font: inherit; caret-color: var(--hot) }
+.neo { display: flex; flex-wrap: wrap; gap: 4px 22px; align-items: flex-start; margin: 2px 0 6px }
+.neo pre { margin: 0; font: inherit; line-height: 1.25; color: var(--blue) }
+.neo dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0 10px; margin: 0; min-width: 0 }
+.neo dt { color: var(--hot); font-weight: 700 }
+.neo dd { margin: 0 }
+.sw { display: inline-block; width: 22px; height: 12px; margin-right: 3px; vertical-align: -1px }
+.help { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0 18px }
+.train { margin: 0; font: inherit; line-height: 1.15; color: var(--str); white-space: pre; overflow: hidden }
 
-        <div id="pagepiling" style="cursor:none">
-            <ul class="social-icon-two">
-                <li><a href="https://keybase.io/doomlol" target="_blank"><span class="fab fa-keybase"></span></a></li>
-                <li><a href="https://github.com/meetkool" target="_blank"><span class="fab fa-github"></span></a></li>
-                <li><a href="http://git.meetssh.ml" target="_blank"><span class="fab fa-git"></span></a></li>
-                <li><a href="https://linkedin.com/in/meet-bhanushali-b69606229/" target="_blank"><span
-                    class="fab fa-linkedin"></span></a></li>
-            </ul>
-            <section class="pp-scrollable section" id="Home">
-                <div class="banner-section">
-                    <div class="sec-icon"><span class="flaticon-home-page"></span></div>
-                    <div class="sec-count">01</div>
-                    <div class="sec-float-text"><span>H</span> <span>O</span> <span>M</span> <span>E</span></div>
-                    <div class="auto-container">
-                        <div class="row">
-                            <div class="content-column col-lg-6 col-md-6">
-                                <div class="content-box">
-                                    <div class="inner-box">
-                                        <div class="title-box">
-                                            <h4>Hello Guys! 👋🏽</h4>
-                                            <h2>I'm Meet Bhanushali.</h2>
-                                            <p>Interested in my work? This is the go to place to learn all about it!</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="image-column">
-                            <div class="background-shape" style="background-image:url(images/icons/shape.svg)"></div>
-                            <div class="main-image" style="background-image:url(images/resource/banner-img.svg)"></div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+/* ---------- taskbar + start ---------- */
+#taskbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; height: calc(var(--tb-h) + env(safe-area-inset-bottom, 0px)); padding: 0 8px env(safe-area-inset-bottom, 0px); display: flex; align-items: center; gap: 8px; background: var(--ink-2); border-top: 2px solid var(--char); font-family: var(--f-mono); font-size: 12px }
+#start { flex: none; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 8px; background: var(--blue); color: var(--char); border: 2px solid var(--char); box-shadow: 3px 3px 0 var(--char); font-family: var(--f-mono); font-weight: 700; font-size: 13px; cursor: pointer }
+#start img { width: 20px; height: 20px }
+#start[aria-expanded="true"] { background: var(--hot) }
+#tasks { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none }
+.task { flex: none; display: flex; align-items: center; gap: 6px; max-width: 180px; height: 34px; padding: 0 10px; background: transparent; border: 1.5px solid #3a3d72; color: var(--dim); font-family: var(--f-mono); font-size: 12px; cursor: pointer }
+.task svg { width: 16px; height: 16px; flex: none }
+.task span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.task.on { border-color: var(--blue); color: var(--paper); background: rgba(20, 157, 204, .16) }
+.task.min { opacity: .6; border-style: dashed }
+#tray { flex: none; display: flex; align-items: center; gap: 14px; color: var(--dim); white-space: nowrap }
+.dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok) }
+#clock { color: var(--paper); font-variant-numeric: tabular-nums }
+#startmenu { position: fixed; left: 8px; bottom: calc(var(--tb-h) + env(safe-area-inset-bottom, 0px) + 8px); z-index: 60; display: flex; width: min(290px, calc(100vw - 16px)); max-height: calc(100% - var(--tb-h) - 24px); background: var(--paper); color: var(--char); border: 2px solid var(--char); box-shadow: 6px 6px 0 var(--blue) }
+#startmenu .band { flex: none; writing-mode: vertical-rl; transform: rotate(180deg); padding: 10px 2px; background: var(--char); color: var(--blue); font-family: var(--f-display); font-size: 28px; letter-spacing: .04em }
+#startmenu .band b { color: var(--hot); font-weight: 400 }
+#startmenu ul { flex: 1; min-width: 0; list-style: none; margin: 0; padding: 6px; overflow-y: auto }
+#startmenu li > button, #startmenu li > a { width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 10px; background: none; border: 0; color: var(--char); font-family: var(--f-mono); font-size: 13px; text-align: left; text-decoration: none; cursor: pointer }
+#startmenu li > button:hover, #startmenu li > a:hover { background: var(--blue) }
+#startmenu svg { width: 20px; height: 20px; flex: none }
+#startmenu .danger { color: var(--hot-ink); font-weight: 700 }
+#startmenu .danger:hover { background: var(--hot) !important; color: var(--char) }
+#startmenu hr { margin: 5px 4px; border: 0; border-top: 1.5px dashed #a9a8c8 }
 
-<!-- done -->
+/* ---------- boot ---------- */
+#boot { position: fixed; inset: 0; z-index: 100; padding: calc(20px + env(safe-area-inset-top, 0px)) 16px 20px; background: var(--cga-bg); color: var(--cga-fg); font-family: var(--f-display); font-size: clamp(17px, 2.3vw, 24px); line-height: 1.12; overflow: hidden; transition: opacity .35s }
+#boot::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .28) 0 1px, transparent 1px 3px) }
+#boot.out { opacity: 0 }
+#boot-text { margin: 0; max-width: 84ch; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere }
+.oem { position: absolute; top: calc(18px + env(safe-area-inset-top, 0px)); right: 18px; width: 72px; height: 72px; image-rendering: pixelated }
+.b-hi { color: var(--cga-hi) } .b-y { color: var(--cga-yel) } .b-c { color: var(--cga-cyan) } .b-g { color: var(--ok) } .b-b { color: #5555ff }
+#grub { max-width: 74ch; margin: 0 auto }
+#grub .gt { text-align: center; margin: 4px 0 14px; color: var(--cga-hi) }
+#grub .box { border: 2px solid var(--cga-fg); padding: 6px 0; min-height: 7em }
+.entry { display: block; width: 100%; padding: 0 .7em; background: none; border: 0; color: var(--cga-fg); font: inherit; text-align: left; text-decoration: none; cursor: pointer }
+.entry.sel { background: var(--cga-fg); color: var(--cga-bg) }
+#grub .gh { margin: 12px 0 0 2ch; white-space: pre-wrap }
+#skip { position: absolute; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 1; padding: 6px 12px; background: transparent; color: var(--cga-fg); border: 1.5px solid var(--cga-fg); font-family: var(--f-mono); font-size: 12px; cursor: pointer }
+#skip:hover { background: var(--cga-fg); color: var(--cga-bg) }
 
-            <section class="section light-section pp-scrollable" id="About">
-                <div class="about-me">
-                    <div class="sec-icon"><span class="flaticon-black-male-user-symbol"></span></div>
-                    <div class="sec-count">02</div>
-                    <div class="sec-float-text"><span>A</span> <span>B</span> <span>O</span> <span>U</span>
-                        <span>T</span>
-                    </div>
-                    <div class="auto-container">
-                        <div class="center-box">
-                            <div class="center-inner">
-                                <div class="sec-title"><span class="title">BASIC INFO ABOUT ME</span>
-                                    <h2>About Myself</h2>
-                                </div>
-                                <div class="row">
-                                    <div class="content-column col-lg-7 col-md-12 col-sm-12 order-2">
-                                        <div class="inner-column">
-                                            <div class="text-box">
-                                                <h4>I am a <span class="theme_color">full stack , DEVOPS and Blockchain developer </span> with
-                                                    interests in <span class="theme_color">music</span>, <span
-                                                        class="theme_color">coding</span>, <span
-                                                        class="theme_color">"Robotics"</span>, and <span
-                                                        class="theme_color">movies</span>!</h4>
-                                                <p>My name is Meet Bhanushali; good day. I'm a young developer who is gradually falling in love with code. My main life aim is to reach space, however I have many other objectives, some of which I'll never accomplish. 🚀</p>
-                                            </div>
-                                            <div class="progress-bars row">
-                                                <div class="bar-item col-lg-6 col-md-6 col-sm-12">
-                                                    <div class="skill-header">
-                                                        <div class="skill-title">Development</div>
-                                                    </div>
-                                                    <div class="skill-bar">
-                                                        <div class="bar-inner">
-                                                            <div class="bar progress-line" data-width="99">
-                                                                <div class="skill-percentage">
-                                                                    <div class="count-box"><span class="count-text"
-                                                                            data-speed="3000" data-stop="99">0</span>%
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="bar-item col-lg-6 col-md-6 col-sm-12">
-                                                    <div class="skill-header">
-                                                        <div class="skill-title">Design</div>
-                                                    </div>
-                                                    <div class="skill-bar">
-                                                        <div class="bar-inner">
-                                                            <div class="bar progress-line" data-width="50">
-                                                                <div class="skill-percentage">
-                                                                    <div class="count-box"><span class="count-text"
-                                                                            data-speed="3000" data-stop="80">0</span>%
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="bar-item col-lg-6 col-md-6 col-sm-12">
-                                                    <div class="skill-header">
-                                                        <div class="skill-title">Organization</div>
-                                                    </div>
-                                                    <div class="skill-bar">
-                                                        <div class="bar-inner">
-                                                            <div class="bar progress-line" data-width="65">
-                                                                <div class="skill-percentage">
-                                                                    <div class="count-box"><span class="count-text"
-                                                                            data-speed="3000" data-stop="75">0</span>%
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="bar-item col-lg-6 col-md-6 col-sm-12">
-                                                    <div class="skill-header clearfix">
-                                                        <div class="skill-title">TeamWork</div>
-                                                    </div>
-                                                    <div class="skill-bar">
-                                                        <div class="bar-inner">
-                                                            <div class="bar progress-line" data-width="70">
-                                                                <div class="skill-percentage">
-                                                                    <div class="count-box"><span class="count-text"
-                                                                            data-speed="3000" data-stop="90">0</span>%
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="fact-counter">
-                                                <div class="row clearfix">
-                                                    <div class="counter-column col-xl-4 col-lg-6 col-md-4 col-sm-4">
-                                                        <div class="count-box"><span class="icon flaticon-fire"></span>
-                                                            <span class="count-text" data-speed="3000"
-                                                                data-stop="20">0</span>
-                                                            <h4 class="counter-title">Projects completed</h4>
-                                                        </div>
-                                                    </div>
-                                                    <div class="counter-column col-xl-4 col-lg-6 col-md-4 col-sm-4">
-                                                        <div class="count-box"><span
-                                                                class="icon flaticon-certificate"></span> <span
-                                                                class="count-text" data-speed="3000"
-                                                                data-stop="1000">0</span>
-                                                            <h4 class="counter-title">and 1000s of Hours</h4>
-                                                        </div>
-                                                    </div>
-                                                    <div class="counter-column col-xl-4 col-lg-6 col-md-4 col-sm-4">
-                                                        <div class="count-box"><span
-                                                                class="icon flaticon-friends-2"></span> <span
-                                                                class="count-text" data-speed="3000"
-                                                                data-stop="156">0</span>
-                                                            <h4 class="counter-title">Contributions on GitHub</h4>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="image-column col-lg-5 col-md-12 col-sm-12">
-                                        <div class="image-box">
-                                            <div class="image"><img src="images/resource/about-img.svg" alt=""
-                                                    data-depth="0.20" class="girl-img"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+/* ---------- panic, space, chaos, fx ---------- */
+#panic { position: fixed; inset: 0; z-index: 110; padding: calc(24px + env(safe-area-inset-top, 0px)) 16px 24px; background: var(--cga-blue); color: var(--cga-hi); font-family: var(--f-display); font-size: clamp(17px, 2.4vw, 25px); line-height: 1.15; overflow: auto; cursor: pointer }
+#panic pre { margin: 0 auto; max-width: 92ch; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere }
+#panic .inv { background: var(--cga-hi); color: var(--cga-blue); padding: 0 .4ch }
+#space { position: fixed; inset: 0; z-index: 90; overflow: hidden; background: transparent }
+#stars { position: absolute; inset: 0; width: 100%; height: 100% }
+#rocket { position: absolute; left: 50%; bottom: -170px; width: 66px; margin-left: -33px; transition: bottom 2.6s cubic-bezier(.45, 0, .7, .3) }
+#rocket .flame { transform-origin: 50% 0; animation: flame .09s steps(2) infinite alternate }
+@keyframes flame { to { transform: scaleY(1.35) scaleX(.85) } }
+#alt { position: absolute; left: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); color: #fff; font-family: var(--f-display); font-size: clamp(48px, 10vw, 112px); line-height: .85; font-variant-numeric: tabular-nums; text-shadow: 3px 3px 0 var(--char) }
+#alt small { display: block; margin-top: 10px; font-family: var(--f-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; text-shadow: none }
+#space-msg { position: absolute; left: 16px; right: 16px; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); max-width: 46ch; padding: 16px 18px; background: var(--paper); color: var(--char); border: 2px solid var(--char); box-shadow: 6px 6px 0 var(--hot); display: flex; flex-direction: column; gap: 12px }
+#space-msg p { margin: 0; font-size: 15.5px; line-height: 1.45 }
+#space-msg strong { font-family: var(--f-mono); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--hot-ink) }
+.sink { transform: translateY(115vh) !important; transition: transform 2.8s cubic-bezier(.55, 0, .85, .35) !important }
+#chaos-banner { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; z-index: 80; transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 8px 14px; background: var(--hot); color: var(--char); border: 2px solid var(--char); box-shadow: 4px 4px 0 var(--char); font-family: var(--f-mono); font-size: 12.5px; font-weight: 700; cursor: pointer; text-align: center }
+body.chaos #desk { animation: hue 2.4s linear infinite, shake .32s steps(3) infinite }
+body.chaos .win { width: min(330px, 72vw) !important; height: min(250px, 42vh) !important; resize: none }
+@keyframes hue { to { filter: hue-rotate(360deg) } }
+@keyframes shake { 0% { transform: translate(0, 0) } 33% { transform: translate(-3px, 2px) } 66% { transform: translate(3px, -2px) } }
+.rain { position: fixed; top: -48px; z-index: 70; width: 40px; height: 40px; pointer-events: none; image-rendering: pixelated; animation: fall 2.4s linear forwards }
+@keyframes fall { to { transform: translateY(calc(100vh + 96px)) rotate(540deg) } }
+body.glitch #desk, body.glitch #taskbar { animation: glitch .14s steps(2) infinite }
+@keyframes glitch { 0% { clip-path: inset(10% 0 40% 0); transform: translateX(-12px) skewX(8deg); filter: invert(1) } 50% { clip-path: inset(50% 0 5% 0); transform: translateX(14px); filter: hue-rotate(120deg) } 100% { clip-path: inset(0 0 70% 0); transform: translateX(-4px) } }
+#fx { position: fixed; inset: 0; z-index: 95; width: 100%; height: 100%; pointer-events: none }
 
+/* ---------- phone ---------- */
+@media (max-width: 719px) {
+  :root { --tb-h: 54px }
+  #icons { right: 10px; left: 10px; top: 10px; bottom: auto; grid-auto-flow: row; grid-template-rows: none; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); grid-auto-columns: auto }
+  .icon { font-size: 11px }
+  .wall-name { left: 16px; bottom: 14px }
+  .wall-name span { font-size: clamp(38px, 12.5vw, 76px) }
+  .hoodie { height: 52%; right: -8% }
+  .win, .win.max { left: 6px !important; top: 6px !important; width: calc(100% - 12px) !important; height: calc(100% - 12px) !important; resize: none; box-shadow: 4px 4px 0 var(--blue) }
+  .win.dlgwin { top: 16% !important; height: min(300px, 64%) !important }
+  .win-btn[data-act="max"] { display: none }
+  #tray .opt { display: none }
+  .task span { display: none }
+  #boot .oem { width: 48px; height: 48px }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.chaos #desk { animation: none }
+  #rocket { transition-duration: .3s }
+  .proj, [data-no] { transition: none }
+}
+</style>
 
+<div id="desk">
+  <canvas id="wall" aria-hidden="true"></canvas>
+  <img class="hoodie" src="images/resource/banner-img.svg" alt="">
+  <div class="wall-name" aria-hidden="true"><span>MEET</span><span>BHANUSHALI</span><small>engineering lead · backend · ai agents · devops · os-dev</small></div>
+  <nav id="icons" aria-label="Desktop"></nav>
+  <div id="wins"></div>
+</div>
 
+<div id="startmenu" hidden>
+  <div class="band" aria-hidden="true">Meet<b>OS</b> 2026</div>
+  <ul id="start-list"></ul>
+</div>
 
+<footer id="taskbar">
+  <button id="start" type="button" aria-expanded="false" aria-controls="startmenu"><img src="images/logo.png" alt="" width="20" height="20">Meet</button>
+  <div id="tasks" role="toolbar" aria-label="Open windows"></div>
+  <div id="tray"><span class="opt"><i class="dot"></i>tor · 3 hops</span><span class="opt">chai 97%</span><time id="clock"></time></div>
+</footer>
 
+<div id="boot" role="status" aria-label="Booting MeetOS">
+  <img class="oem" src="images/logo.png" alt="">
+  <pre id="boot-text"></pre>
+  <div id="grub" hidden>
+    <div class="gt">GNU GRUB  version 2.12-meet</div>
+    <div class="box" id="grub-list"></div>
+    <div class="gh" id="grub-help"></div>
+  </div>
+  <button id="skip" type="button">Esc · skip boot</button>
+</div>
 
-            <!-- done -->
-            <section class="section pp-scrollable" id="Resume">
-                <div class="resume-section">
-                    <div class="sec-icon"><span class="flaticon-cv"></span></div>
-                    <div class="sec-count">03</div>
-                    <div class="sec-float-text"><span>R</span> <span>E</span> <span>S</span> <span>U</span>
-                        <span>M</span> <span>E</span>
-                    </div>
-                    <div class="auto-container">
-                        <div class="center-box">
-                            <div class="center-inner">
-                                <div class="sec-title light"><span class="title">MY EXPERIENCE IN THIS WORLD</span>
-                                    <h2>Experience & Education:- <a href="https://bit.ly/MeetKB_Resume"><i> link to pdf</i></a></h2>
-                                </div>
-                                <div class="resume-tabs">
-                                    <ul class="resume-tab-btns tab-buttons clearfix">
-                                        <li class="resume-tab-btn active-btn" data-tab="#Education" style="cursor:none">
-                                            Education</li>
-                                        <li class="resume-tab-btn" data-tab="#Expirience" style="cursor:none">Experience
-                                        </li>
-                                    </ul>
-                                    <div class="resume-tabs-content">
-                                        <div class="resume-tab active-tab" id="Education">
-                                            <div class="resume-carousel owl-carousel owl-theme">
-                                                <div class="slide-item">
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>Anubhuti Residential School</h4><span
-                                                                    class="year">2012 - 2016</span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4></h4>
-                                                                <p>Anubhuti Residential School an ICSE affiliated School based in Jalgaon, Maharashtra, India. The school stands in the top 10 list of ISC residential schools. It is a co-educational residential school.</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>NHSS</h4><span
-                                                                    class="year">2016 - 2019</span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4>High School</h4>
-                                                                <p>A select admissions school with a three year,
-                                                                    </p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>PACE Junior Collage Thane</h4><span
-                                                                    class="year">2019 - 2021</span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4></h4>
-                                                                <p>PACE Junior Science College is successfully involved in providing quality education system for 11th and 12th class in Thane</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>Indian Institute of Information Technology, Lucknow</h4><span
-                                                                    class="year">2021 - Current</span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4></h4>
-                                                                <p>Indian Institute of Information Technology, Lucknow is a technical university, one of the Indian Institute of Information Technology, in Lucknow that focuses on Information Technology</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="resume-tab" id="Expirience">
-                                            <div class="resume-carousel owl-carousel owl-theme">
-                                                <div class="slide-item">
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>Freelance</h4><span class="year">2022 -
-                                                                    <strong>Current</strong></span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4>Full Stack Developer</h4>
-                                                                <p>I work on front and back end development, including
-                                                                    a LAMP Stack, Node.js/NPM,React/nextjs and Content Delivery
-                                                                    Networking</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>MerciAI</h4><span class="year">2022 FEB -
-                                                                    MARCH 2022</span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4>Student Intern</h4>
-                                                                <p>I contributed to the development of an artificial intelligence 
-                                                                    model that defends against DDOS attacks and blocks IP addresses.
-                                                                     On top of that, 
-                                                                    I worked on a website that was written in react.js.
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>Class Representative</h4><span
-                                                                    class="year">Jan 2022 - Oct 2022</span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4>Class Representative</h4>
-                                                                <p>I a CR of my CS branch</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>Uttar Pradesh Power Corporation ( Uppcl )</h4><span
-                                                                    class="year">Aug 2022 - Nov 2022 </span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4>Teacher Assistant</h4>
-                                                                <p>Teaching reactjs mysql mongodb</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>Incubation Center, IIIT Lucknow · Part-time</h4><span
-                                                                    class="year">May 2022 - Present</span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4>Web Development Intern</h4>
-                                                                <p><b>Skills</b>: JavaScript · TypeScript · React.js · Node.js · SASS · Next.js:</p>
-                                                               
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>Axios , IIITLucknow</h4><span class="year">Dec 2022 - Present</span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4>Member in following wings:-</h4>
-                                                                <p>Axios the technical club of The Indian Institute of Information Technology, Lucknow was constituted in 2019 with the aim to spread applied computer science culture among the students of our institute. It is a community of highly enthusiastic students indulging in competitive programming, ethical hacking, Web Designing and all other aspects of Information Technology.<br></p>
-                                                                <ul style="color:#9d98b1;list-style:inside circle">
-                                                                    <li style="color:#9d98b1;list-style:inside circle">
-                                                                        Web Development Wing Member </li>
-                                                                    <li style="color:#9d98b1;list-style:inside circle">
-                                                                        FOSS Wing Member</li>
-                                                                    <li style="color:#9d98b1;list-style:inside circle">
-                                                                        Blockchain Wing</li>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>WCARL Drone Project</h4><span class="year">2021 -
-                                                                    <strong>Current</strong></span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4>Hardware Lead</h4>
-                                                                <p>Aim:Arducopter powered with recyclable smart phone for research in agriculture and farm fields using AI/ML
+<div id="space" hidden>
+  <canvas id="stars" aria-hidden="true"></canvas>
+  <svg id="rocket" viewBox="0 0 60 124" aria-hidden="true">
+    <path class="flame" d="M23 80 Q30 122 37 80Z" fill="#ffb000"/>
+    <path class="flame" d="M26 80 Q30 104 34 80Z" fill="#ffff55"/>
+    <path d="M30 3 C45 18 47 42 44 72 H16 C13 42 15 18 30 3Z" fill="#f1f0fa" stroke="#151532" stroke-width="2.5"/>
+    <circle cx="30" cy="34" r="7.5" fill="#149dcc" stroke="#151532" stroke-width="2.5"/>
+    <path d="M16 50 L3 76 L16 71Z M44 50 L57 76 L44 71Z" fill="#ff00a2" stroke="#151532" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M21 72 H39 L36 80 H24Z" fill="#151532"/>
+  </svg>
+  <div id="alt">0.0 km<small id="layer">troposphere</small></div>
+  <div id="space-msg" hidden>
+    <strong>Kármán line crossed · 100 km</strong>
+    <p>Life goal #1 from the about page: reach space. Simulated today, for real someday.</p>
+    <div class="dlg-btns"><button class="btn" type="button" id="land">Return to Earth</button></div>
+  </div>
+</div>
 
-                                                                    After over 2 months of trial and error and broken parts, it finally successfully lifts off!
-                                                                    
-                                                                    This project has been quite the eye-opening journey, with our initial attempts at making our own flight controller using an Arduino (With its major stability issues) to switching to a ready-made flight controller to learn and observe its working, it's been a thrilling experience in hardware.
-                                                                    Now that the drone is finally functional, we will be researching its flight and working on the later stages of this project integrating machine learning to process the video taken through this drone and give valuable insights.</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="resume-block">
-                                                        <div class="inner-box">
-                                                            <div class="expirience">
-                                                                <h4>WCARL Tax Automation</h4><span class="year">2018</span>
-                                                            </div><span class="devider"></span>
-                                                            <div class="text-box">
-                                                                <h4>Shop Assistant</h4>
-                                                                <p>GST Tax Automation .</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+<div id="panic" hidden><pre id="panic-text"></pre></div>
+<button id="chaos-banner" type="button" hidden>CHAOS MODE · press Esc or tap here to make it stop</button>
+<canvas id="fx" aria-hidden="true"></canvas>
 
+<script>
+(() => {
+'use strict';
 
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const narrow = () => innerWidth < 720;
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const ss = {
+  get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* storage blocked */ } }
+};
+const ext = (href, text) => `<a href="${esc(href)}" target="_blank" rel="noopener">${text}</a>`;
+const CLASSIC_URL = 'classic.html';
 
+/* ---------- content (resume Oct 2026, the 2022 site and the GitHub README) ---------- */
+const ME = {
+  github: 'https://github.com/meetkool',
+  linkedin: 'https://www.linkedin.com/in/meet-bhanushali-kool/',
+  keybase: 'https://keybase.io/doomlol',
+  git: 'http://git.meet508.tech',
+  resume: 'Meet_Bhanushali_Resume.pdf',
+  email: 'workwithmeet@outlook.com',
+  phone: '+91 81698 44837',
+  city: 'Mumbai, India',
+  codeforces: 'https://codeforces.com/profile/SherlockonLoop',
+  codechef: 'https://www.codechef.com/users/sherlockagain'
+};
+const SKILLS = [['Development', 99], ['Design', 80], ['Organization', 75], ['Teamwork', 90]];
+const STACK = [
+  ['Languages', ['Python', 'Go', 'Rust', 'TypeScript', 'JavaScript', 'C/C++', 'Java', 'SQL', 'GraphQL']],
+  ['Backend', ['FastAPI', 'Django', 'Node.js', 'tRPC', 'NestJS', 'Celery', 'BullMQ', 'WebSockets', 'SSE']],
+  ['AI / LLM', ['PyTorch', 'Hugging Face', 'LangChain', 'LangGraph', 'MCP', 'vLLM', 'Ollama', 'Whisper', 'RAG', 'Qdrant', 'pgvector']],
+  ['Apps', ['Next.js', 'React', 'React Native', 'Flutter']],
+  ['Infra', ['PostgreSQL', 'Redis', 'MongoDB', 'Docker', 'Kubernetes', 'Terraform', 'AWS', 'GCP', 'GitHub Actions']]
+];
+/* newest first: the resume window shows it with `tac` */
+const LOG = [
+  ['Mar 2026 →', 'work', 'TDF - Diamonds & Gold', 'Software Engineer 1 · Engineering Lead · Mumbai', [
+    'Lead all company software, shipping 6 apps: TMS, LMS, Ticketing, Payment Approval, Keka PMS and the Gold app.',
+    'Built the TMS for 200+ employees: Next.js 16 UI → tRPC API (NextAuth, Prisma/PostgreSQL, Redis, BullMQ, SSE), with RBAC across 28 permissions × 7 roles, row-level scoping and a page-access console.',
+    'Built Admin Ticketing with SLA tracking, and a Payment Approval / Pay Order system with approval chains.',
+    'Built the Gold app (300+ users in its first month): Flutter (Riverpod, MVVM) → Turborepo Next.js API with 150+ endpoints; OTP + JWT refresh sessions, admin roles, Razorpay, KYC and TIC vouchers.',
+    'Self-host 10 Docker containers on an on-prem NAS (Garage S3, Metabase, LMS); GCP infra via Terraform.'
+  ]],
+  ['May 2025–Feb 2026', 'work', 'Resollect', 'Software Engineer · Bangalore', [
+    'Django REST Framework APIs; indexing and pagination cut load time from 60 s to 5 s on 10K+ records.',
+    'Built Iris, an AI loan-document extractor: AWS Textract / Google Vision OCR plus two-pass Gemini extraction into 212 fields, with confidence-based human review and a rate-limited API-key pool.',
+    'Celery pipelines (PyMuPDF, OpenCV, pyzbar) for PDF generation and QR scans: 1,000+ documents a day.',
+    'Owned the legal case-management backend (NestJS, PostgreSQL) end to end: multi-stage approvals, lawyer assignment and a daily eCourt sync job; coordinated 2 interns.',
+    'Delivered a production React Native field-officer app (GPS, photo capture) in 20 days, a day early.'
+  ]],
+  ['Oct 2024–Jan 2025', 'work', 'Intract', 'DevOps intern · Gurugram', [
+    'Led the AWS-to-GCP migration of 71+ services, cutting monthly costs 27% (₹35K to ₹25.5K).',
+    'Managed 25+ blockchain node networks; built CI/CD pipelines on GitHub Actions and GCP.'
+  ]],
+  ['Dec 2021–Mar 2025', 'edu', 'IIIT Lucknow', 'B.Tech, Computer Science', 'Indian Institute of Information Technology, Lucknow.'],
+  ['Dec 2022', 'club', 'Axios, IIIT Lucknow', 'Member', 'The institute\'s technical club. Web Development, FOSS and Blockchain wings.'],
+  ['Aug–Nov 2022', 'teach', 'UPPCL', 'Teacher assistant', 'Taught React.js, MySQL and MongoDB at Uttar Pradesh Power Corporation.'],
+  ['May 2022', 'work', 'Incubation Center, IIIT Lucknow', 'Web development intern (part-time)', 'JavaScript, TypeScript, React.js, Node.js, SASS, Next.js.'],
+  ['2022', 'work', 'Freelance', 'Full stack developer', 'Front and back end work: LAMP stack, Node.js/npm, React/Next.js and content delivery networks.'],
+  ['Feb–Mar 2022', 'work', 'MerciAI', 'Student intern', 'Helped build an AI model that defends against DDoS attacks by blocking IP addresses, plus a website in React.js.'],
+  ['Jan–Oct 2022', 'lead', 'Class Representative', 'CS branch', 'Class representative for my computer science batch.'],
+  ['2021', 'build', 'WCARL Drone Project', 'Hardware lead', 'An ArduCopter powered by a recycled smartphone, for AI/ML research on farm fields. Started with a home-made Arduino flight controller (very unstable), switched to a ready-made one, and after two months of broken parts it finally lifted off. Featured in The Times of India.'],
+  ['2019–2021', 'edu', 'PACE Junior Science College, Thane', '', '11th and 12th grade.'],
+  ['2018', 'work', 'WCARL Tax Automation', 'Shop assistant', 'GST tax automation.'],
+  ['2016–2019', 'edu', 'NHSS', 'High school', 'A select-admissions school with a three-year program.'],
+  ['2012–2016', 'edu', 'Anubhuti Residential School', '', 'ICSE-affiliated, co-educational residential school in Jalgaon, Maharashtra. One of the top 10 ISC residential schools.']
+];
+const ACHV = [
+  ['Codeforces Expert, rating 1656', '@SherlockonLoop', 'https://codeforces.com/profile/SherlockonLoop'],
+  ['CodeChef 4★, rating 1890', '@sherlockagain', 'https://www.codechef.com/users/sherlockagain'],
+  ['Global rank 4, CodeChef Starters 114 (Div 2)', 'results', 'https://www.codechef.com/START114B'],
+  ['Hackofista: rank 2 of 400 teams', 'certificate', 'https://certopus.com/c/240f1be862cc4887a081130c9b77ea13'],
+  ['WCARL Drone Project featured in The Times of India', 'article', 'https://timesofindia.indiatimes.com/city/lucknow/iiit-lucknow-faculty-students-develop-economical-desi-agri-drone-using-android-tech/articleshow/98570990.cms']
+];
+const LATEST = [
+  { name: 'Cyoni', stack: 'Python · FastAPI · MCP', desc: 'Multi-agent AI platform and MCP hub, built solo. An LLM router hands chats to worker agents that call MCP tools; the hub mounts 20 FastMCP servers (48 tools) on one endpoint. Ships as 8 Docker services.', url: '' },
+  { name: 'SarvamAI-Go-SDK', stack: 'Go · open source', desc: 'Go SDK (v0.3.0) for Sarvam chat (Sarvam-105B, tool calling), TTS, duplex streaming speech, live transcription and batch diarization in 11 Indian languages. 73 offline tests.', url: 'https://github.com/meetkool/SarvamAI-Go-SDK' },
+  { name: 'Sarvam Voice Agent', stack: 'Go · WebSockets', desc: 'Real-time multilingual voice assistant: mic audio → Sarvam STT → LLM → streaming TTS. A concurrent turn machine handles barge-in and backchannel filtering; 19 tests run against a local fake of all three services.', url: 'https://github.com/meetkool/SarvamAI-Go-SDK/tree/main/examples/voice_agent' }
+];
+const PROJECTS = [
+  { name: 'urleditor', stack: 'JavaScript', desc: 'A URL editor, made with JavaScript.', img: 'images/gallery/2.png', url: 'https://github.com/meetkool/urleditor' },
+  { name: 'nardcart-droplets', stack: 'PHP', desc: 'Droplet hosting, made with PHP.', img: 'images/gallery/1.png', url: 'https://github.com/meetkool/nardcart-droplets' },
+  { name: 'onion-livestreaming', stack: 'Flask · Tor', desc: 'Live streaming over the Tor network.', img: 'images/gallery/onion-livestreaming.png', url: 'https://github.com/meetkool/onion-livestreaming' },
+  { name: 'D&Dz', stack: 'JavaScript', desc: 'A suite of tools for 5th Edition D&D players and DMs.', img: 'images/gallery/6.png', url: 'https://github.com/d-a-s-h-o/dnd' },
+  { name: 'shuter-game', stack: 'JavaScript', desc: 'A shooter game in the browser.', img: 'images/gallery/5.png', url: 'https://github.com/meetkool/shuter-game' },
+  { name: 'movie-streaming-script', stack: 'PHP', desc: 'Movie streaming API. Find and watch any movie.', img: 'images/gallery/4.png', url: 'https://github.com/meetkool/movie-streaming-script' },
+  { name: 'kubernetes-examples', stack: 'Kubernetes', desc: 'Notes and examples for all the clusters.', img: 'images/gallery/kubernetes-notes.png', url: 'https://github.com/meetkool/kubernetes-examples-tesings' },
+  { name: 'dkforest', stack: 'Go · Tor', desc: 'A forum site for the Tor network, written in Go.', img: '', url: 'https://github.com/meetkool/dkforest' },
+  { name: 'slopnet', stack: 'IRC', desc: 'The notorious slopnet, plus a tempest clone for EFnet chatters.', img: 'images/gallery/7.png', url: 'https://github.com/meetkool/slopnet' },
+  { name: 'NFT-firewall', stack: 'Linux', desc: 'A simple yet powerful firewall for a desktop PC.', img: '', url: 'https://github.com/meetkool/NFT-firewall' }
+];
+const ACTIVE = [
+  { name: 'Dashed Hosting', stack: 'PHP · Tor', desc: 'PHP hosting for the Tor network.', url: 'https://github.com/d-a-s-h-o/tor-php-hosting' },
+  { name: 'Freenet Hosting', stack: 'Hosting', desc: 'Free hosting, in progress.', url: 'https://github.com/freejooo/freenet-hosting-' },
+  { name: 'heroku-vnc', stack: 'Docker', desc: 'A VNC desktop on Heroku.', url: 'https://github.com/freejooo/heroku-vnc' },
+  { name: 'Markeasyblog', stack: 'Markdown', desc: 'A blog that runs on Markdown.', url: 'https://github.com/freejooo/Markeasyblog' }
+];
+const SERVICES = [
+  ['backend', 'APIs that stay fast under load: Django REST, FastAPI, tRPC, NestJS. Took a 10K-record page from 60 s to 5 s.'],
+  ['ai_agents', 'Multi-agent systems, MCP servers, RAG and OCR pipelines. Iris pulls 212 fields out of a loan document.'],
+  ['devops', 'Docker, Kubernetes, Terraform, GitHub Actions. Moved 71+ services from AWS to GCP and cut the bill 27%.'],
+  ['mobile', 'Flutter and React Native. The Gold app reached 300+ users in its first month.'],
+  ['develop', 'I love developing applications with the most up-to-date technologies and newest frameworks. It\'s fun learning something new!'],
+  ['design', 'UX is just as important as all the backend stuff, and I love solving CSS problems just as much as Bash problems.'],
+  ['web_to_app', 'Matching the aesthetics of websites with their powerful backends, making WebApps with ReactJS, Angular and ElectronJS.'],
+  ['rewriting', 'I rewrite code and keep it organized, easy to understand, and lower in latency.'],
+  ['editing', 'I create and edit visuals with Inkscape. Vectoring has never been so easy and fun.'],
+  ['responsive', 'You can\'t go online without a mobile responsive application. Like duh...']
+];
+const BOOKS = [
+  [1, 'The Dark Net', 'Jamie Bartlett', 'https://www.amazon.co.uk/Dark-Net-Jamie-Bartlett/dp/0099592029'],
+  [1, 'Walling Out the Insiders', 'Michael Erbschloe', 'https://www.routledge.com/Walling-Out-the-Insiders-Controlling-Access-to-Improve-Organizational-Security/Erbschloe/p/book/9781138031609'],
+  [1, 'Collaborative Cyber Threat Intelligence', 'Florian Skopik', 'https://www.routledge.com/Collaborative-Cyber-Threat-Intelligence-Detecting-and-Responding-to-Advanced/Skopik/p/book/9781138031821'],
+  [1, 'Advanced Penetration Testing', 'Will Allsopp', 'https://onlinelibrary.wiley.com/doi/book/10.1002/9781119367741'],
+  [1, 'Secrets and Lies', 'Bruce Schneier', 'https://onlinelibrary.wiley.com/doi/book/10.1002/9781119183631'],
+  [1, 'Social Engineering: The Science of Human Hacking', 'Christopher Hadnagy', 'https://onlinelibrary.wiley.com/doi/book/10.1002/9781119433729'],
+  [1, '12 Rules for Life', 'Jordan Peterson', 'https://www.jordanbpeterson.com/12-rules-for-life/'],
+  [1, 'Silence on the Wire', 'Michal Zalewski', 'https://nostarch.com/silence.htm'],
+  [1, 'Attacking Network Protocols', 'James Forshaw', 'https://nostarch.com/networkprotocols'],
+  [0, 'Security Engineering', 'Ross J. Anderson', 'https://www.wiley.com/en-us/Security+Engineering%3A+A+Guide+to+Building+Dependable+Distributed+Systems%2C+2nd+Edition-p-9780470068526'],
+  [0, 'The Hacker and the State', 'Ben Buchanan', 'https://www.hup.harvard.edu/catalog.php?isbn=9780674987555']
+];
 
+/* ---------- icons ---------- */
+const fileIcon = inner => `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 3h16l9 9v25H8z" fill="#f1f0fa" stroke="#151532" stroke-width="2"/><path d="M24 3v9h9" fill="#c9c8e2" stroke="#151532" stroke-width="2"/>${inner}</svg>`;
+const ICON = {
+  txt: fileIcon('<path d="M12 18h17M12 23h17M12 28h11" stroke="#149dcc" stroke-width="2.4"/>'),
+  log: fileIcon('<path d="M12 17h6M20 17h9M12 22h6M20 22h7M12 27h6M20 27h9M12 32h6" stroke="#151532" stroke-width="2"/><path d="M12 17h6M12 27h6" stroke="#ff00a2" stroke-width="2.4"/>'),
+  cfg: fileIcon('<text x="20.5" y="31" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="11" fill="#149dcc">[ ]</text>'),
+  sh: fileIcon('<text x="20.5" y="31" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="12" fill="#1a9c3c">$_</text>'),
+  md: fileIcon('<text x="20.5" y="31" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="11" fill="#c4007c">M↓</text>'),
+  dir: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M3 8h13l3 4h18v22H3z" fill="#149dcc" stroke="#151532" stroke-width="2"/><path d="M3 15h34" stroke="#151532" stroke-width="2"/></svg>',
+  term: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="3" y="6" width="34" height="28" fill="#0a0b1c" stroke="#f1f0fa" stroke-width="2"/><path d="M3 6h34v5H3z" fill="#f1f0fa"/><path d="M9 17l5 4-5 4" stroke="#55ff55" stroke-width="2.5" fill="none"/><path d="M17 27h10" stroke="#f1f0fa" stroke-width="2.5"/></svg>',
+  trash: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26" stroke="#f1f0fa" stroke-width="2.5"/><path d="M16 10V6h8v4" fill="none" stroke="#f1f0fa" stroke-width="2"/><path d="M10 10l2 26h16l2-26z" fill="#9a9cc8" stroke="#151532" stroke-width="2"/><path d="M16 16v14M20 16v14M24 16v14" stroke="#151532" stroke-width="1.8"/></svg>',
+  exe: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 4l17 31H3z" fill="#ff00a2" stroke="#151532" stroke-width="2.2" stroke-linejoin="round"/><path d="M20 15v10" stroke="#151532" stroke-width="3.4" stroke-linecap="square"/><path d="M20 29v2.6" stroke="#151532" stroke-width="3.4" stroke-linecap="square"/></svg>',
+  rocket: '<svg viewBox="0 0 40 40" aria-hidden="true"><g transform="rotate(35 20 20)"><path d="M20 2c8 7 9 17 7 27H13c-2-10-1-20 7-27z" fill="#f1f0fa" stroke="#151532" stroke-width="2"/><circle cx="20" cy="15" r="3.6" fill="#149dcc" stroke="#151532" stroke-width="1.8"/><path d="M13 22l-5 10 5-2zM27 22l5 10-5-2z" fill="#ff00a2" stroke="#151532" stroke-width="1.8" stroke-linejoin="round"/><path d="M16 30q4 9 8 0z" fill="#ffb000"/></g></svg>'
+};
 
+/* ---------- apps ---------- */
+const APPS = {
+  about: { title: 'about.txt — notepad', icon: 'txt', w: 470, h: 560, render: () => `
+    <article class="doc">
+      <p class="kicker">~/about.txt · basic info about me</p>
+      <h1>Meet Bhanushali</h1>
+      <p class="lede">Software engineer and engineering lead in ${ME.city}. I build backends, AI agents and the infrastructure they run on.</p>
+      <p class="now"><b>now</b> · Engineering Lead at TDF - Diamonds &amp; Gold, shipping 6 internal apps<br><b>before</b> · Resollect (Bangalore), Intract (Gurugram)<br><b>edu</b> · B.Tech CS, IIIT Lucknow, 2021–2025</p>
+      <p>I'm a developer who is gradually falling in love with code. My main life aim is to reach space. I have many other objectives too, some of which I'll never accomplish.</p>
+      <p>Off the keyboard: music, robotics and movies.</p>
+      <h2>Self-assessment (unaudited)</h2>
+      <div class="meters">${SKILLS.map(([k, v]) => `<div class="meter"><span>${k}</span><span class="bar" style="--v:${v}%"></span><b>${v}%</b></div>`).join('')}</div>
+      <div class="stats">
+        <div class="stat"><b>6</b><span>apps shipped as engineering lead</span></div>
+        <div class="stat"><b>1656</b><span>${ext(ME.codeforces, 'Codeforces')} (Expert)</span></div>
+        <div class="stat"><b>1890</b><span>${ext(ME.codechef, 'CodeChef')} (4★)</span></div>
+      </div>
+      <h2>Tech I use</h2>
+      <div class="stack-g">${STACK.map(([g, items]) => `<div><h3>${g}</h3><div class="chips">${items.map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div></div>`).join('')}</div>
+      <p class="tip">Try the terminal: type <code>help</code>. And whatever you do, don't open <code>DO_NOT_CLICK.exe</code>.</p>
+    </article>` },
 
-            <section class="section light-section pp-scrollable" id="Services">
-                <div class="services-section">
-                    <div class="sec-icon"><span class="fa fa-cog"></span></div>
-                    <div class="sec-count">04</div>
-                    <div class="sec-float-text"><span>S</span> <span>E</span> <span>R</span> <span>V</span>
-                        <span>I</span> <span>C</span> <span>E</span> <span>S</span>
-                    </div>
-                    <div class="auto-container">
-                        <div class="center-box">
-                            <div class="center-inner">
-                                <div class="sec-title"><span class="title">MY EXPERIENCE IN THIS WORLD</span>
-                                    <h2>Things I like to do</h2>
-                                </div>
-                                <div class="row masonry-items-container">
-                                    <div class="service-block masonry-item col-lg-4 col-md-6 col-sm-12">
-                                        <div class="inner-box">
-                                            <div class="floating-text">Develop</div>
-                                            <div class="title-box"><span class="icon flaticon-programming"></span>
-                                                <h3>Develop</h3>
-                                            </div>
-                                            <div class="text">I love developing applications with the most up-to-date
-                                                technologies and newest frameworks. It's fun learning something new!
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="service-block masonry-item block-two col-lg-4 col-md-6 col-sm-12">
-                                        <div class="inner-box">
-                                            <div class="floating-text">Design</div>
-                                            <div class="title-box"><span class="icon flaticon-edit-tools"></span>
-                                                <h3>Design</h3>
-                                            </div>
-                                            <div class="text">UX is just as important as all the backend stuff - and I
-                                                love solving CSS problems just as much as Bash problems!</div>
-                                        </div>
-                                    </div>
-                                    <div class="service-block masonry-item block-three col-lg-4 col-md-6 col-sm-12">
-                                        <div class="inner-box">
-                                            <div class="floating-text">WebApp</div>
-                                            <div class="title-box"><span class="icon flaticon-analytics"></span>
-                                                <h3>Web to App</h3>
-                                            </div>
-                                            <div class="text">Most recently, I have been matching the beautiful
-                                                aesthetics of the websites with their powerful backends, making
-                                                incredible WebApps thanks to tools like ReactJS, Angular, and
-                                                ElectronJS.</div>
-                                        </div>
-                                    </div>
-                                    <div class="service-block masonry-item col-lg-4 col-md-6 col-sm-12">
-                                        <div class="inner-box">
-                                            <div class="floating-text">Rewriting</div>
-                                            <div class="title-box"><span class="icon flaticon-writing"></span>
-                                                <h3>Rewriting</h3>
-                                            </div>
-                                            <div class="text">I often rewrite code and keep it totally organized and in
-                                                a way that makes it easy understand, and improves on latency.</div>
-                                        </div>
-                                    </div>
-                                    <div class="service-block masonry-item col-lg-4 col-md-6 col-sm-12">
-                                        <div class="inner-box">
-                                            <div class="floating-text">Editing</div>
-                                            <div class="title-box"><span class="icon flaticon-focus-1"></span>
-                                                <h3>Editing</h3>
-                                            </div>
-                                            <div class="text">I create and edit visuals thanks to the power of Inkscape.
-                                                Vectoring has never been so easy and fun!</div>
-                                        </div>
-                                    </div>
-                                    <div class="service-block masonry-item col-lg-4 col-md-6 col-sm-12">
-                                        <div class="inner-box">
-                                            <div class="floating-text">Responsive</div>
-                                            <div class="title-box"><span class="icon flaticon-smartphone"></span>
-                                                <h3>Responsive</h3>
-                                            </div>
-                                            <div class="text">In 2021 you can't go online without having a mobile
-                                                responsive application. Like duh...</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+  resume: { title: 'resume.log — less', icon: 'log', w: 640, h: 560, render: () => `
+    <div class="log">
+      <div class="log-head"><span>$ tac /var/log/meet/resume.log</span>${ext(ME.resume, 'resume (PDF) ↗')}</div>
+      <div class="legend"><span class="tag work">WORK</span><span class="tag edu">EDU</span><span class="tag achv">ACHV</span><span class="tag build">BUILD</span><span class="tag lead">LEAD</span><span class="tag teach">TEACH</span><span class="tag club">CLUB</span></div>
+      ${LOG.map(([ts, t, name, role, desc]) => `<div class="log-row"><span class="ts">[${ts}]</span><span class="tag ${t}">${t.toUpperCase()}</span><div><b>${esc(name)}</b>${role ? ` <span class="role">· ${esc(role)}</span>` : ''}${Array.isArray(desc) ? `<ul>${desc.map(d => `<li>${esc(d)}</li>`).join('')}</ul>` : `<p>${esc(desc)}</p>`}</div></div>`).join('')}
+      <div class="log-sub">$ grep ACHV /var/log/meet/achievements.log</div>
+      ${ACHV.map(([what, label, url]) => `<div class="log-row"><span class="ts"></span><span class="tag achv">ACHV</span><div><b>${esc(what)}</b> <span class="role">· ${ext(url, esc(label) + ' ↗')}</span></div></div>`).join('')}
+    </div>` },
 
+  projects: { title: '~/projects — files', icon: 'dir', w: 760, h: 580, render: () => {
+    const card = p => `<article class="proj"><div class="thumb">${p.img ? `<img src="${p.img}" alt="Screenshot of ${esc(p.name)}" loading="lazy">` : `$ cd ${esc(p.name.toLowerCase().replace(/\s+/g, '-'))}<i>_</i>`}</div><div class="meta"><span class="stack">${esc(p.stack)}</span><h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p>${p.url ? ext(p.url, 'view source ↗').replace('<a ', '<a class="src" ') : '<span class="src">private repo · built solo</span>'}</div></article>`;
+    return `
+    <div class="ex-bar"><span class="ex-path">/home/meet/projects</span>${ext(ME.github, 'GitHub ↗')}${ext(ME.git, 'self-hosted git ↗')}</div>
+    <p class="ex-h">latest/ · AI agents and voice, 2025–2026</p>
+    <div class="ex-grid">${LATEST.map(card).join('')}</div>
+    <p class="ex-h">built/ · earlier things I have worked on</p>
+    <div class="ex-grid">${PROJECTS.map(card).join('')}</div>
+    <p class="ex-h">hosting/ · tor and hosting experiments</p>
+    <div class="ex-grid">${ACTIVE.map(card).join('')}</div>`;
+  } },
 
+  services: { title: 'services.cfg — nano', icon: 'cfg', w: 600, h: 500, render: () => {
+    const lines = ['<span class="k-c">; /etc/meet/services.cfg</span>', '<span class="k-c">; things I like to do</span>', ''];
+    SERVICES.forEach(([k, v]) => {
+      lines.push(`<span class="k-s">[${k}]</span>`, `<span class="k-k">enabled</span> = <span class="k-ok">true</span>`, `<span class="k-k">note</span>    = <span class="k-v">"${esc(v)}"</span>`, '');
+    });
+    lines.push('<span class="k-c">; ^X exit   ^O hire   ^K chaos</span>');
+    return `<div class="code">${lines.map(l => `<div class="cl"><span>${l || ' '}</span></div>`).join('')}</div>`;
+  } },
 
+  contact: { title: 'contact.sh — vim', icon: 'sh', w: 620, h: 470, render: () => {
+    const lines = [
+      '<span class="k-c">#!/usr/bin/env bash</span>',
+      '<span class="k-c"># have I left you wanting more? get in touch today.</span>',
+      '',
+      `<span class="k-k">EMAIL</span>=<span class="k-v">"${ME.email}"</span><button class="copy" type="button" data-copy="${ME.email}">copy</button>`,
+      `<span class="k-k">PHONE</span>=<span class="k-v">"${ME.phone}"</span><button class="copy" type="button" data-copy="${ME.phone}">copy</button>`,
+      `<span class="k-k">LINKEDIN</span>=<span class="k-v">"${ext(ME.linkedin, 'linkedin.com/in/meet-bhanushali-kool')}"</span>`,
+      `<span class="k-k">GITHUB</span>=<span class="k-v">"${ext(ME.github, 'github.com/meetkool')}"</span>`,
+      `<span class="k-k">KEYBASE</span>=<span class="k-v">"${ext(ME.keybase, 'keybase.io/doomlol')}"</span>`,
+      `<span class="k-k">RESUME</span>=<span class="k-v">"${ext(ME.resume, 'Meet_Bhanushali_Resume.pdf')}"</span>`,
+      `<span class="k-k">CODEFORCES</span>=<span class="k-v">"${ext(ME.codeforces, 'SherlockonLoop')}"</span>`,
+      `<span class="k-k">LOCATION</span>=<span class="k-v">"${ME.city}"</span>`,
+      '',
+      '<span class="k-c"># a great developer once said:</span>',
+      'echo <span class="k-v">"Adios!"</span>',
+      '<span class="k-s">exit</span> 0',
+      '',
+      '<span class="k-c">~</span>',
+      '<span class="k-c">~</span>',
+      '<span class="k-c">"contact.sh" 15L, written. (no, you can\'t :q! out of this)</span>'
+    ];
+    return `<div class="code">${lines.map(l => `<div class="cl"><span>${l || ' '}</span></div>`).join('')}</div>`;
+  },
+  mount(el) {
+    $$('[data-copy]', el).forEach(b => b.addEventListener('click', () => {
+      const done = ok => { b.textContent = ok ? 'copied' : 'select it'; setTimeout(() => { b.textContent = 'copy'; }, 1600); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(b.dataset.copy).then(() => done(true), () => { selectPrev(b); done(false); });
+      else { selectPrev(b); done(false); }
+    }));
+  } },
 
+  books: { title: 'books.md — reading list', icon: 'md', w: 470, h: 520, render: () => `
+    <article class="doc">
+      <p class="kicker">~/books.md</p>
+      <h1>Books to read</h1>
+      <ul class="books">${BOOKS.map(([done, t, a, u]) => `<li><span>[${done ? 'x' : ' '}]</span><span>${ext(u, esc(t))} <em>by ${esc(a)}</em></span></li>`).join('')}</ul>
+    </article>` },
 
-            <!-- done -->
-            <section class="section pp-scrollable" id="Portfolio">
-                <div class="portfolio-section">
-                    <div class="sec-icon"><span class="flaticon-portfolio"></span></div>
-                    <div class="sec-count">05</div>
-                    <div class="sec-float-text">
-                        <span>P</span><span>O</span><span>R</span><span>T</span><span>F</span><span>O</span><span>L</span><span>I</span><span>O</span>
-                    </div>
-                    <div class="auto-container">
-                        <div class="center-box">
-                            <div class="center-inner">
-                                <div class="sec-title light"><span class="title">MEET MY PROJECTS</span>
-                                    <h2>My Portfolio</h2>
-                                    <h4>every thing is on my 
-                                        <a href="https://github.com/meetkool" class="custom-link">GitHub</a>
-                                         or my personal self hosted git server : <a href="http://git.meet508.tech" style="color:red;">git.meet508.tech</a>
-                                         
-                                        </h4>
-                                        <br>
-                                        <h6>There is a collection of my UI/UX DESIGNS here:- <a href="/ui" class="custom-link">MY AWESOME DESIGNS</a></h6>
-                                </div>
-                                
-                                
-                                <div class="project-tab">
-                                    <div class="tab-btns-box">
-                                        <div class="tabs-header">
-                                            <ul class="project-tab-btns clearfix">
-                                                <li class="p-tab-btn active-btn" data-tab="#p-tab-1"
-                                                    style="cursor:none">All Work</li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                    <div class="p-tabs-content">
-                                        <div class="p-tab active-tab" id="p-tab-1" style="cursor:none">
-                                            <div class="about-projects">
-                                                <h4>Here you can see <span class="theme_color">some things</span> that I
-                                                    have worked on</h4>
-                                                    <span
-                                                        class="fab fa-github"></span> icon to see the project.</p>
-                                            </div>
-                                            <div class="carouse-outer" style="cursor:none">
-                                                <div class="project-carousel owl-theme owl-carousel">
-                                                    <div class="project-block">
-                                                        <div class="inner-box">
-                                                            <div class="image-box">
-                                                                <figure class="image"><img src="images/gallery/2.png"
-                                                                        alt=""></figure>
-                                                            </div>
-                                                            <div class="caption-box">
-                                                                <h4>urleditor</h4>
-                                                                <div class="cat"><a>Made with</a> <a>JavaScript</a>
-                                                                    <li><a href="https://github.com/meetkool/urleditor"
-                                                                            target="_blank"><span
-                                                                                class="fab fa-github"></span></a></li>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="project-block">
-                                                        <div class="inner-box">
-                                                            <div class="caption-box">
-                                                                <h4>&lt;noscript&gt; Droplet Hosting</h4>
-                                                                <div class="cat"><a>Made with</a> <a>PHP</a>
-                                                                    <li><a href="https://github.com/meetkool/nardcart-droplets"
-                                                                            target="_blank"><span
-                                                                                class="fab fa-github"></span></a></li>
-                                                                </div>
-                                                            </div>
-                                                            <div class="image-box">
-                                                                <figure class="image"><img src="images/gallery/1.png"
-                                                                        alt=""></figure>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="project-block">
-                                                        <div class="inner-box">
-                                                            <div class="image-box">
-                                                                <figure class="image"><img src="https://raw.githubusercontent.com/meetkool/onion-livestreaming/main/demo.png"
-                                                                        alt=""></figure>
-                                                            </div>
-                                                            <div class="caption-box">
-                                                                <h4>onion-livestreaming</h4>
-                                                                <div class="cat"><a>Made with</a> <a>flast and tor netowrk</a>
-                                                                    <li><a href="https://github.com/meetkool/onion-livestreaming"
-                                                                            target="_blank"><span
-                                                                                class="fab fa-github"></span></a></li>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="project-block even">
-                                                        <div class="inner-box">
-                                                            <div class="caption-box">
-                                                                <h4>D&Dz</h4>
-                                                                <div class="cat"><a>Made with</a> <a>JavaScript</a>
-                                                                    <li><a href="https://github.com/d-a-s-h-o/dnd"
-                                                                            target="_blank"><span
-                                                                                class="fab fa-github"></span></a></li>
-                                                                </div>
-                                                            </div>
-                                                            <div class="image-box">
-                                                                <figure class="image"><img src="images/gallery/6.png"
-                                                                        alt=""></figure>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="project-block">
-                                                        <div class="inner-box">
-                                                            <div class="image-box">
-                                                                <figure class="image"><img src="images/gallery/5.png"
-                                                                        alt=""></figure>
-                                                            </div>
-                                                            <div class="caption-box">
-                                                                <h4>shuter-game</h4>
-                                                                <div class="cat"><a>Made with</a> <a>JavaScript</a>
-                                                                    <li><a href="https://github.com/meetkool/shuter-game"
-                                                                            target="_blank"><span
-                                                                                class="fab fa-github"></span></a></li>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="project-block even">
-                                                        <div class="inner-box">
-                                                            <div class="caption-box">
-                                                                <h4>&lt;noscript&gt; Movie streaming api -- u can get see any movies here</h4>
-                                                                <div class="cat"><a>Made with</a> <a>PHP</a>
-                                                                    <li><a href="https://github.com/meetkool/movie-streaming-script"
-                                                                            target="_blank"><span
-                                                                                class="fab fa-github"></span></a></li>
-                                                                </div>
-                                                            </div>
-                                                            <div class="image-box">
-                                                                <figure class="image"><img src="images/gallery/4.png"
-                                                                        alt=""></figure>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="project-block">
-                                                        <div class="inner-box">
-                                                            <div class="image-box">
-                                                                <figure class="image"><img src="https://raw.githubusercontent.com/meetkool/kubernetes-examples-tesings/main/Screenshot%20from%202023-02-02%2019-12-24.png"
-                                                                        alt=""></figure>
-                                                            </div>
-                                                            <div class="caption-box">
-                                                                <h4>kubernetes notes all the cuslters</h4>
-                                                                <div class="cat">
-                                                                    <li><a href="https://github.com/meetkool/kubernetes-examples-tesings"
-                                                                            target="_blank"><span
-                                                                                class="fab fa-github"></span></a></li>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="project-block">
-                                                        <div class="inner-box">
-                                                            <div class="image-box">
-                                                                <figure class="image"><img src="https://user-images.githubusercontent.com/96396841/216351824-5ed97806-9419-4144-a9ad-87385c27aee5.png"
-                                                                        alt=""></figure>
-                                                            </div>
-                                                            <div class="caption-box">
-                                                                <h4>dkforest --forum site in goland for tor network</h4>
-                                                                <div class="cat">
-                                                                    <li><a href="https://github.com/meetkool/dkforest"
-                                                                            target="_blank"><span
-                                                                                class="fab fa-github"></span></a></li>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="project-block">
-                                                        <div class="inner-box">
-                                                            <div class="image-box">
-                                                                <figure class="image"><img src="https://user-images.githubusercontent.com/96396841/216344019-242159a4-5d9b-4022-964f-ebbae469dee8.png"
-                                                                        alt=""></figure>
-                                                            </div>
-                                                            <div class="caption-box">
-                                                                <h4>tempest clone for shoving in faces of efnet chatters</h4>
-                                                                <div class="cat">
-                                                                    <li><a href="https://github.com/meetkool/slopnet"
-                                                                            target="_blank"><span
-                                                                                class="fab fa-github"></span></a></li>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div class="project-block">
-                                                        <div class="inner-box">
-                                                            <div class="image-box">
-                                                                <figure class="image"><img src="images/gallery/7.png"
-                                                                        alt=""></figure>
-                                                            </div>
-                                                            <div class="caption-box">
-                                                                <h4>slopnet --> notorious slopnet malware</h4>
-                                                                <div class="cat">
-                                                                    <li><a href="https://github.com/meetkool/slopnet"
-                                                                            target="_blank"><span
-                                                                                class="fab fa-github"></span></a></li>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="project-block">
-                                                        <div class="inner-box">
-                                                        
-                                                            <div class="caption-box">
-                                                                <h4>NFT-firewall --> simple yet powerful firewall for a desktop pc</h4>
-                                                                <div class="cat">
-                                                                    <li><a href="https://github.com/meetkool/NFT-firewall"
-                                                                            target="_blank"><span
-                                                                                class="fab fa-github"></span></a></li>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+  trash: { title: 'Trash', icon: 'trash', w: 460, h: 340, render: () => `
+    <ul class="trash">
+      <li><a class="restore" href="${CLASSIC_URL}" target="_blank" rel="noopener">portfolio_2022.html</a><span class="sz">64 KB · restore ↗</span></li>
+      <li><button type="button" data-t="sleep_schedule.bak: file is corrupted beyond repair since 2021.">sleep_schedule.bak</button><span class="sz">0 B</span></li>
+      <li><button type="button" data-t="free_time.txt: empty. as expected.">free_time.txt</button><span class="sz">0 B</span></li>
+      <li><button type="button" data-t="node_modules/: restoring would take 3 business days.">node_modules/</button><span class="sz">2.3 GB</span></li>
+      <li><button type="button" data-t="arduino_flight_controller.ino: unstable. replaced by a ready-made FC. RIP.">arduino_flight_controller.ino</button><span class="sz">12 KB</span></li>
+    </ul>
+    <p class="trash-status" aria-live="polite"></p>`,
+  mount(el) {
+    $$('[data-t]', el).forEach(b => b.addEventListener('click', () => { $('.trash-status', el).textContent = b.dataset.t; }));
+  } },
 
-            
-            <section class="section pp-scrollable" id="contact">
-                <div class="contact-section">
-                    <div class="sec-icon"><span class="flaticon-support-2"></span></div>
-                    <div class="sec-count">06</div>
-                    <div class="sec-float-text"><span>C</span> <span>O</span> <span>N</span> <span>T</span>
-                        <span>A</span> <span>C</span> <span>T</span>
-                    </div>
-                    <div class="auto-container">
-                        <div class="center-box">
-                            <div class="center-inner">
-                                <div class="sec-title light"><span class="title">HAVE I LEFT YOU WANTING MORE?</span>
-                                    <h2>Get in touch today</h2>
-                                </div>
-                                <div class="row">
-                                    <div class="contact-info-block col-lg-4 col-md-6 col-sm-12">
-                                        <div class="inner"><span class="icon flaticon-envelope"></span>
-                                            <h4>Email</h4>
-                                            <p><a href="mailto:lcs2021023@iiitl.ac.in">lcs2021023@iiitl.ac.in</a></p>
-                                        </div>
-                                    </div>
-                                    <div class="contact-info-block col-lg-4 col-md-6 col-sm-12">
-                                        <div class="inner"><span class="icon flaticon-support"></span>
-                                            <h4>linkedin</h4>
-                                            <p><a href="https://linkedin.com/in/meet-bhanushali-b69606229/" target="_blank">Check my all my
-                                                    socials Here!</a></p>
-                                        </div>
-                                    </div>
-                                    <div class="contact-info-block col-lg-4 col-md-6 col-sm-12">
-                                        <div class="inner"><span class="icon flaticon-support"></span>
-                                            <h4>Socials</h4>
-                                            <p><a >7738333380 WhatsApp no </a></p>
-                                        </div>
-                                    </div>
-                                    <div class="contact-info-block col-lg-4 col-md-6 col-sm-12">
-                                        <div class="inner"><span class="icon flaticon-pin"></span>
-                                            <h4>Location</h4>
-                                            <p>Mumbai, India</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <h1 class="sign-off">A great developer once said:<br><span
-                                class="xlarge"><em>"Adios!"</em></span></h1>
-                    </div>
-                    <footer class="main-footer">
-                        <div class="auto-container">
-                            <div class="logo"><a href="index.html"><img src="images/logo.png" alt="" title=""></a></div>
-                            <div class="text">This website was made with ❤️ by Meet Bhanushali</div>
-                            <ul class="social-icon-four">
-                                <li><a href="https://keybase.io/doomlol" target="_blank"><span class="fab fa-keybase"></span></a></li>
-                                <li><a href="https://github.com/meetkool" target="_blank"><span class="fab fa-github"></span></a></li>
-                                <li><a href="http://git.meetssh.ml" target="_blank"><span class="fab fa-git"></span></a></li>
-                                <li><a href="https://linkedin.com/in/meet-bhanushali-b69606229/" target="_blank"><span
-                                    class="fab fa-linkedin"></span></a></li>
-                            </ul>
-                        </div>
-                    </footer>
-                </div>
-            </section>
-        </div>
-        <script src="js/cursor.min.js"></script>
-        <script>new kursor({ type: 1, removeDefaultCursor: !0, color: "#149dcc" })</script>
-        <script src="js/jquery.min.js"></script>
-        <script src="js/popper.min.js"></script>
-        <script src="js/bootstrap.min.js"></script>
-        <script src="js/jquery.fancybox.min.js"></script>
-        <script src="js/appear.min.js"></script>
-        <script src="js/owl.min.js"></script>
-        <script src="js/wow.min.js"></script>
-        <script src="js/parallax.min.js"></script>
-        <script src="js/jquery.pagepiling.min.js"></script>
-        <script src="js/isotope.min.js"></script>
-        <script src="js/script.min.js"></script>
-    </div>
-</body>
+  terminal: { title: 'meet@nardcart: ~', icon: 'term', w: 580, h: 420, render: () => `
+    <div class="term">
+      <div class="term-out" aria-live="polite"></div>
+      <form class="term-row" autocomplete="off"><label for="term-input">meet@nardcart:~$</label><input id="term-input" spellcheck="false" autocapitalize="off" autocomplete="off" enterkeyhint="go"></form>
+      <div class="term-sugg" role="group" aria-label="Suggested commands"><span>tap to run:</span>${SUGGEST.map(c => `<button type="button" data-cmd="${c}"${c.startsWith('rm') ? ' class="danger"' : ''}>${c}</button>`).join('')}</div>
+    </div>`,
+  mount(el) { mountTerminal(el); } },
 
+  hire: { title: 'hire_meet.exe', icon: 'exe', w: 400, h: 270, center: true, render: () => `
+    <div class="dlg">
+      <p><strong>Meet Bhanushali</strong> ships backends, AI agents and the infra under them. Work with Meet?</p>
+      <p class="fine">Recommended by 10 out of 10 Meets. Codeforces Expert, so the No button is fast.</p>
+      <div class="dlg-btns"><button class="btn" type="button" data-yes>Yes, hire</button><button class="btn ghost" type="button" data-no>No</button></div>
+    </div>`,
+  mount(el) {
+    const body = $('.dlg', el), no = $('[data-no]', el);
+    const labels = ['No', 'Nope', 'Are you sure?', 'Really?', 'Last chance', 'Fine, yes'];
+    let n = 0;
+    const flee = () => {
+      n++;
+      if (n >= labels.length - 1) { no.textContent = labels[labels.length - 1]; no.dataset.converted = '1'; no.classList.remove('ghost'); no.classList.add('hot'); return; }
+      no.textContent = labels[n];
+      const b = body.getBoundingClientRect(), r = no.getBoundingClientRect();
+      no.style.position = 'absolute';
+      no.style.left = (4 + Math.random() * Math.max(0, b.width - r.width - 8)) + 'px';
+      no.style.top = (4 + Math.random() * Math.max(0, b.height - r.height - 8)) + 'px';
+    };
+    no.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse' && !no.dataset.converted) flee(); });
+    no.addEventListener('click', () => { if (no.dataset.converted) hired(); else flee(); });
+    $('[data-yes]', el).addEventListener('click', hired);
+  } },
+
+  uac: { title: 'User Account Control', icon: 'exe', w: 420, h: 280, center: true, render: () => `
+    <div class="dlg">
+      <p>Do you want to allow <strong>DO_NOT_CLICK.exe</strong> to make changes to this portfolio?</p>
+      <p class="fine">Verified publisher: Meet Bhanushali (probably)<br>File origin: a 2 a.m. idea</p>
+      <div class="dlg-btns"><button class="btn hot" type="button" data-go>Yes</button><button class="btn ghost" type="button" data-go>Also yes</button></div>
+    </div>`,
+  mount(el) { $$('[data-go]', el).forEach(b => b.addEventListener('click', () => { closeWin('uac'); startChaos(); })); } }
+};
+
+function selectPrev(btn) {
+  const span = btn.previousElementSibling;
+  if (!span) return;
+  const range = document.createRange(); range.selectNodeContents(span);
+  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+}
+
+/* ---------- window manager ---------- */
+const winsEl = $('#wins');
+const wins = new Map();
+let z = 10, cascade = 0, focusedId = null;
+
+function openApp(id, opts = {}) {
+  closeStart();
+  if (wins.has(id)) {
+    const el = wins.get(id);
+    el.hidden = false; focusWin(id);
+    return el;
+  }
+  const app = APPS[id];
+  const el = document.createElement('section');
+  el.className = 'win' + (app.center ? ' dlgwin' : '');
+  el.dataset.id = id;
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', app.title);
+  el.innerHTML = `<header class="win-bar">${ICON[app.icon]}<span class="win-title">${esc(app.title)}</span>
+    <button class="win-btn" type="button" data-act="min" aria-label="Minimize">_</button>
+    <button class="win-btn" type="button" data-act="max" aria-label="Maximize">□</button>
+    <button class="win-btn x" type="button" data-act="close" aria-label="Close">×</button></header>
+    <div class="win-body">${app.render()}</div>`;
+  winsEl.appendChild(el);
+  const W = winsEl.clientWidth, H = winsEl.clientHeight;
+  const w = Math.min(app.w, W - 24), h = Math.min(app.h, H - 24);
+  let x, y;
+  if (opts.at) [x, y] = opts.at(W, H, w, h);
+  else if (app.center) { x = (W - w) / 2; y = (H - h) / 2.4; }
+  else { x = 220 + (cascade % 6) * 34; y = 22 + (cascade % 6) * 30; cascade++; }
+  x = Math.max(8, Math.min(x, W - w - 12)); y = Math.max(8, Math.min(y, H - h - 12));
+  Object.assign(el.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+  el.addEventListener('pointerdown', () => focusWin(id), true);
+  el.querySelector('.win-bar').addEventListener('click', e => {
+    const act = e.target.closest('[data-act]');
+    if (!act) return;
+    if (act.dataset.act === 'close') closeWin(id);
+    if (act.dataset.act === 'min') { el.hidden = true; if (focusedId === id) focusedId = null; renderTasks(); }
+    if (act.dataset.act === 'max') el.classList.toggle('max');
+  });
+  el.querySelector('.win-bar').addEventListener('dblclick', e => { if (!e.target.closest('[data-act]')) el.classList.toggle('max'); });
+  makeDraggable(el);
+  wins.set(id, el);
+  if (app.mount) app.mount(el);
+  focusWin(id);
+  return el;
+}
+
+function focusWin(id) {
+  const el = wins.get(id);
+  if (!el) return;
+  focusedId = id;
+  el.style.zIndex = ++z;
+  wins.forEach((w, k) => w.classList.toggle('focused', k === id));
+  renderTasks();
+}
+
+function closeWin(id) {
+  const el = wins.get(id);
+  if (!el) return;
+  el.remove(); wins.delete(id);
+  if (id === 'terminal') T = null;
+  if (focusedId === id) focusedId = null;
+  renderTasks();
+}
+
+function makeDraggable(el) {
+  const bar = el.querySelector('.win-bar');
+  let sx, sy, ox, oy, dragging = false;
+  bar.addEventListener('pointerdown', e => {
+    if (e.target.closest('[data-act]') || narrow() || el.classList.contains('max') || document.body.classList.contains('chaos')) return;
+    dragging = true; sx = e.clientX; sy = e.clientY; ox = el.offsetLeft; oy = el.offsetTop;
+    bar.setPointerCapture(e.pointerId);
+  });
+  bar.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const W = winsEl.clientWidth, H = winsEl.clientHeight;
+    const x = Math.max(80 - el.offsetWidth, Math.min(W - 80, ox + e.clientX - sx));
+    const y = Math.max(0, Math.min(H - 34, oy + e.clientY - sy));
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+  });
+  const end = () => { dragging = false; };
+  bar.addEventListener('pointerup', end);
+  bar.addEventListener('pointercancel', end);
+}
+
+const tasksEl = $('#tasks');
+function renderTasks() {
+  tasksEl.innerHTML = '';
+  wins.forEach((el, id) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'task' + (id === focusedId && !el.hidden ? ' on' : '') + (el.hidden ? ' min' : '');
+    b.innerHTML = `${ICON[APPS[id].icon]}<span>${esc(APPS[id].title.split(' — ')[0])}</span>`;
+    b.setAttribute('aria-label', APPS[id].title);
+    b.addEventListener('click', () => {
+      if (el.hidden) { el.hidden = false; focusWin(id); }
+      else if (focusedId === id) { el.hidden = true; focusedId = null; renderTasks(); }
+      else focusWin(id);
+    });
+    tasksEl.appendChild(b);
+  });
+}
+
+/* ---------- desktop icons + start menu ---------- */
+const DESKTOP = [
+  ['about.txt', 'txt', () => openApp('about')],
+  ['resume.log', 'log', () => openApp('resume')],
+  ['projects', 'dir', () => openApp('projects')],
+  ['services.cfg', 'cfg', () => openApp('services')],
+  ['contact.sh', 'sh', () => openApp('contact')],
+  ['books.md', 'md', () => openApp('books')],
+  ['terminal', 'term', () => openApp('terminal')],
+  ['launch.sh', 'rocket', () => launch()],
+  ['Trash', 'trash', () => openApp('trash')],
+  ['DO_NOT_CLICK.exe', 'exe', () => openApp('uac'), 'danger']
+];
+DESKTOP.forEach(([label, icon, fn, cls]) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'icon' + (cls ? ' ' + cls : '');
+  b.innerHTML = `${ICON[icon]}<span>${esc(label).replace(/_/g, '_<wbr>').replace(/\.(\w+)$/, '<wbr>.$1')}</span>`;
+  b.addEventListener('click', fn);
+  $('#icons').appendChild(b);
+});
+
+const START = [
+  ['About me', 'txt', () => openApp('about')],
+  ['Resume', 'log', () => openApp('resume')],
+  ['Projects', 'dir', () => openApp('projects')],
+  ['Services', 'cfg', () => openApp('services')],
+  ['Contact', 'sh', () => openApp('contact')],
+  ['Reading list', 'md', () => openApp('books')],
+  ['Terminal', 'term', () => openApp('terminal')],
+  null,
+  ['Launch to space', 'rocket', () => launch()],
+  ['Chaos mode', 'exe', () => openApp('uac')],
+  ['Old portfolio (2022) ↗', 'trash', CLASSIC_URL],
+  null,
+  ['Reboot', 'term', () => reboot()],
+  ['rm -rf /', 'exe', () => { const el = openApp('terminal'); if (el && T) T.auto('sudo rm -rf /'); }, 'danger']
+];
+START.forEach(item => {
+  const li = document.createElement('li');
+  if (!item) { li.innerHTML = '<hr>'; $('#start-list').appendChild(li); return; }
+  const [label, icon, fn, cls] = item;
+  if (typeof fn === 'string') {
+    li.innerHTML = `<a href="${fn}" target="_blank" rel="noopener">${ICON[icon]}${esc(label)}</a>`;
+    li.firstChild.addEventListener('click', closeStart);
+  } else {
+    li.innerHTML = `<button type="button"${cls ? ` class="${cls}"` : ''}>${ICON[icon]}${esc(label)}</button>`;
+    li.firstChild.addEventListener('click', () => { closeStart(); fn(); });
+  }
+  $('#start-list').appendChild(li);
+});
+const startBtn = $('#start'), startMenu = $('#startmenu');
+function closeStart() { startMenu.hidden = true; startBtn.setAttribute('aria-expanded', 'false'); }
+startBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  const open = startMenu.hidden;
+  startMenu.hidden = !open; startBtn.setAttribute('aria-expanded', String(open));
+  if (open) startMenu.querySelector('button, a').focus();
+});
+document.addEventListener('pointerdown', e => { if (!startMenu.hidden && !startMenu.contains(e.target) && e.target !== startBtn && !startBtn.contains(e.target)) closeStart(); });
+
+/* clock */
+const clock = $('#clock');
+const tick = () => { const d = new Date(); clock.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); clock.dateTime = d.toISOString(); };
+tick(); setInterval(tick, 15000);
+
+/* ---------- wallpaper ---------- */
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function paintWall() {
+  const cv = $('#wall'), dpr = Math.min(2, devicePixelRatio || 1);
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (!w || !h) return;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const c = cv.getContext('2d'); c.scale(dpr, dpr);
+  const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#10112a'); g.addColorStop(1, '#171a3d');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  c.fillStyle = 'rgba(154,156,200,.13)';
+  for (let x = 14; x < w; x += 28) for (let y = 14; y < h; y += 28) c.fillRect(x, y, 1.5, 1.5);
+  const r = rng(2026);
+  const splat = (cx, cy, size, color) => {
+    c.fillStyle = color; c.strokeStyle = color;
+    c.beginPath(); c.arc(cx, cy, size, 0, Math.PI * 2); c.fill();
+    for (let i = 0; i < 46; i++) {
+      const a = r() * Math.PI * 2, d = size * (1 + Math.pow(r(), 1.6) * 4.2), s = Math.max(.8, size * .26 * (1 - d / (size * 5.4)));
+      c.beginPath(); c.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, s, 0, Math.PI * 2); c.fill();
+    }
+    for (let i = 0; i < 7; i++) {
+      const a = r() * Math.PI * 2, d = size * (2 + r() * 3);
+      c.lineWidth = 1 + r() * 2.2; c.beginPath(); c.moveTo(cx + Math.cos(a) * size * .8, cy + Math.sin(a) * size * .8); c.lineTo(cx + Math.cos(a) * d, cy + Math.sin(a) * d); c.stroke();
+    }
+  };
+  splat(w * .14, h * .2, 26, 'rgba(20,157,204,.22)');
+  splat(w * .48, h * .62, 34, 'rgba(20,157,204,.16)');
+  splat(w * .36, h * .14, 12, 'rgba(255,0,162,.22)');
+}
+paintWall();
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(paintWall, 150); });
+
+/* ---------- terminal ---------- */
+let T = null;
+const FILES = ['about.txt', 'Meet_Bhanushali_Resume.pdf', 'books.md', 'contact.sh', 'DO_NOT_CLICK.exe', 'launch.sh', 'projects/', 'resume.log', 'services.cfg'];
+const OPENABLE = { about: 'about', 'about.txt': 'about', resume: 'resume', 'resume.log': 'resume', projects: 'projects', 'projects/': 'projects', services: 'services', 'services.cfg': 'services', contact: 'contact', 'contact.sh': 'contact', books: 'books', 'books.md': 'books', trash: 'trash', terminal: 'terminal' };
+const SUGGEST = ['about', 'resume', 'projects', 'services', 'contact', 'books', 'help', 'tor', 'launch', 'chaos', 'sudo hire-meet', 'rm -rf /'];
+const CMDS = ['help', 'ratings', 'whoami', 'neofetch', 'ls', 'cat', 'open', 'about', 'projects', 'resume', 'services', 'contact', 'books', 'trash', 'tor', 'sl', 'launch', 'chaos', 'sudo', 'rm', 'reboot', 'clear', 'date', 'echo', 'history', 'exit', 'hire-meet'];
+
+function mountTerminal(el) {
+  const out = $('.term-out', el), input = $('#term-input', el), form = $('form', el), body = $('.win-body', el);
+  const hist = []; let hi = 0, busy = false, typing = false;
+  const chips = $$('.term-sugg button', el);
+  const lock = on => { chips.forEach(b => { b.disabled = on; }); };
+  const scroll = () => { body.scrollTop = body.scrollHeight; };
+  const print = (html, cls = '') => { const d = document.createElement('div'); d.className = 'ln ' + cls; d.innerHTML = html; out.appendChild(d); scroll(); return d; };
+  const run = async raw => {
+    const cmd = raw.trim();
+    print(`<span class="t-p">meet@nardcart:~$</span> ${esc(raw)}`);
+    if (!cmd) return;
+    hist.push(cmd); hi = hist.length;
+    busy = true; input.disabled = true; lock(true);
+    try { await exec(cmd, print, out); } finally { busy = false; lock(false); if (T) { input.disabled = false; if (!narrow()) input.focus({ preventScroll: true }); } scroll(); }
+  };
+  form.addEventListener('submit', e => { e.preventDefault(); if (busy) return; const v = input.value; input.value = ''; run(v); });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'ArrowUp') { if (hi > 0) input.value = hist[--hi]; e.preventDefault(); }
+    else if (e.key === 'ArrowDown') { hi = Math.min(hist.length, hi + 1); input.value = hist[hi] || ''; e.preventDefault(); }
+    else if (e.key === 'Tab') {
+      e.preventDefault();
+      const parts = input.value.split(' '), last = parts[parts.length - 1];
+      const pool = parts.length > 1 ? FILES : CMDS;
+      const hits = pool.filter(c => c.startsWith(last));
+      if (hits.length === 1) { parts[parts.length - 1] = hits[0]; input.value = parts.join(' ') + (hits[0].endsWith('/') ? '' : ' '); }
+      else if (hits.length > 1) print(hits.join('  '), 't-d');
+    } else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); out.innerHTML = ''; }
+  });
+  $('.term', el).addEventListener('click', e => { if (!e.target.closest('.term-sugg, a, button') && !getSelection().toString()) input.focus({ preventScroll: true }); });
+  $('.term-sugg', el).addEventListener('click', e => { const b = e.target.closest('[data-cmd]'); if (b && T) T.auto(b.dataset.cmd, 32); });
+  T = {
+    print, out, hist,
+    async auto(text, speed = 55) {
+      if (busy || typing) return;
+      typing = true; lock(true);
+      input.value = '';
+      for (const ch of text) { input.value += ch; await wait(reduced ? 0 : speed); }
+      await wait(reduced ? 0 : 160);
+      input.value = '';
+      typing = false;
+      await run(text);
+    }
+  };
+}
+
+const NEOFETCH_ART = [
+  '        /\\',
+  '       /  \\',
+  '      | () |',
+  '      |    |',
+  '     /|    |\\',
+  '    / |    | \\',
+  '   /__|____|__\\',
+  '      /_/\\_\\',
+  '       \' \' \''
+].join('\n');
+
+async function exec(cmd, print, out) {
+  const [name, ...args] = cmd.split(/\s+/);
+  const arg = args.join(' ');
+  switch (name) {
+    case 'help':
+      print(`<div class="help">${[
+        ['whoami', 'who is this'], ['neofetch', 'system info, but it\'s me'], ['ls', 'list files'], ['cat &lt;file&gt;', 'print a file (try books.md)'],
+        ['about · resume · projects', 'open that window'], ['services · contact · books', 'open that window too'],
+        ['ls projects', 'list projects with links'], ['ratings', 'Codeforces, CodeChef and other wins'], ['open &lt;app&gt;', 'about, resume, projects, services, contact, books, trash'],
+        ['tor', 'build an onion circuit'], ['sl', 'you meant ls'], ['launch', 'go to space (life goal #1)'], ['chaos', 'you were warned'],
+        ['sudo hire-meet', 'the correct answer'], ['rm -rf /', 'please don\'t'], ['reboot', 'boot again'], ['clear', 'clear the screen']
+      ].map(([c, d]) => `<span class="t-y">${c}</span><span class="t-d">${d}</span>`).join('')}</div>`);
+      print('<span class="t-d">tab completes, ↑ ↓ for history, or tap a command below.</span>');
+      break;
+    case 'whoami':
+      print('meet bhanushali. engineering lead at TDF - Diamonds & Gold. backend, AI agents, devops. still aiming for space.');
+      break;
+    case 'neofetch': {
+      const rows = [
+        ['OS', 'MeetOS 2026 x86_64 (bare metal)'], ['Host', 'TDF - Diamonds &amp; Gold'], ['Role', 'Software Engineer 1 · Engineering Lead'], ['Kernel', '6.20.26-crazy'],
+        ['Uptime', 'coding since 2021, no reboots for sleep'], ['Shell', 'zsh + ./whoiam'], ['Stack', 'Python · Go · TypeScript · Rust'], ['AI', 'LangChain · LangGraph · MCP · vLLM'],
+        ['Ratings', 'CF Expert 1656 · CodeChef 4★ 1890'], ['Packages', `${LATEST.length + PROJECTS.length + ACTIVE.length} repos (git)`], ['Location', ME.city], ['Goal', 'reach space <span class="t-h">[pending]</span>']
+      ];
+      print(`<div class="neo"><pre>${esc(NEOFETCH_ART)}</pre><dl><dt>meet@nardcart</dt><dd>&nbsp;</dd>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}<dt>&nbsp;</dt><dd><span class="sw" style="background:var(--ink)"></span><span class="sw" style="background:var(--blue)"></span><span class="sw" style="background:var(--hot)"></span><span class="sw" style="background:var(--str)"></span><span class="sw" style="background:var(--ok)"></span><span class="sw" style="background:var(--paper)"></span></dd></dl></div>`);
+      break;
+    }
+    case 'ls': {
+      if (args.some(a => a.replace(/\/$/, '') === 'projects')) {
+        [...LATEST, ...PROJECTS, ...ACTIVE].forEach(p => print(`<span class="t-y">${esc(p.name.padEnd(24))}</span><span class="t-d">${esc(p.stack.padEnd(13))}</span>${ext(p.url, 'source ↗')}`));
+        break;
+      }
+      const all = args.some(a => /^-\w*a/.test(a));
+      const list = (all ? ['.', '..', '.secrets'] : []).concat(FILES);
+      print(list.map(f => f.endsWith('/') ? `<span class="t-p t-b">${f}</span>` : f.endsWith('.exe') ? `<span class="t-h t-b">${f}</span>` : f.endsWith('.sh') ? `<span class="t-g t-b">${f}</span>` : f).join('  '));
+      break;
+    }
+    case 'cat':
+      if (!arg) { print('cat: missing file operand. try <span class="t-y">cat books.md</span>'); break; }
+      if (arg === 'about.txt') print('Meet Bhanushali\nSoftware engineer and engineering lead at TDF - Diamonds &amp; Gold, Mumbai.\nBackends, AI agents, devops. B.Tech CS, IIIT Lucknow (2021–2025).\nMain life aim: reach space. (run <span class="t-y">./launch.sh</span>)');
+      else if (arg === 'books.md') BOOKS.forEach(([d, t, a, u]) => print(`<span class="t-h">[${d ? 'x' : ' '}]</span> ${ext(u, esc(t))} <span class="t-d">by ${esc(a)}</span>`));
+      else if (arg === 'resume.log') LOG.forEach(([ts, t, n, r]) => print(`<span class="t-d">[${ts}]</span> <span class="t-y">${t.toUpperCase().padEnd(5)}</span> ${esc(n)}${r ? ` <span class="t-d">· ${esc(r)}</span>` : ''}`));
+      else if (arg === 'contact.sh') print(`EMAIL=<span class="t-y">${ME.email}</span>\nPHONE=<span class="t-y">${ME.phone}</span>\nLINKEDIN=${ext(ME.linkedin, 'linkedin.com/in/meet-bhanushali-kool')}\nGITHUB=${ext(ME.github, 'github.com/meetkool')}\nLOCATION=<span class="t-y">${ME.city}</span>`);
+      else if (arg === 'services.cfg') SERVICES.forEach(([k]) => print(`<span class="t-p">[${k}]</span> enabled = <span class="t-g">true</span>`));
+      else if (arg === 'projects/' || arg === 'projects') print('cat: projects/: Is a directory');
+      else if (/^(resume\.pdf|Meet_Bhanushali_Resume\.pdf)$/.test(arg)) print(`cat: ${esc(arg)}: binary file. open it instead: ${ext(ME.resume, 'Meet_Bhanushali_Resume.pdf ↗')}`);
+      else if (arg === 'DO_NOT_CLICK.exe') print('cat: DO_NOT_CLICK.exe: binary file. it wants to be run, not read.');
+      else if (arg === 'launch.sh') print('#!/bin/sh\n<span class="t-d"># life goal #1</span>\nignite && ascend --until karman-line');
+      else if (arg === '.secrets') print('nice try. there are no secrets here, only side projects.');
+      else print(`cat: ${esc(arg)}: No such file or directory`);
+      break;
+    case 'open': case 'xdg-open': {
+      const id = OPENABLE[arg];
+      if (id) { openApp(id); print(`opening ${esc(arg)}…`, 't-d'); }
+      else print(`open: what's "${esc(arg)}"? try: about, resume, projects, services, contact, books, trash`);
+      break;
+    }
+    case './contact.sh': openApp('contact'); print('running contact.sh…', 't-d'); break;
+    case './launch.sh': case 'launch': print('T-minus 3… 2… 1…', 't-y'); await wait(reduced ? 0 : 500); launch(); break;
+    case './DO_NOT_CLICK.exe': case 'chaos': print('you were warned.', 't-h'); openApp('uac'); break;
+    case 'about': openApp('about'); print('opening about.txt…', 't-d'); break;
+    case 'projects': openApp('projects'); print('opening ~/projects… (<span class="t-y">ls projects</span> lists them here)', 't-d'); break;
+    case 'services': openApp('services'); print('opening services.cfg…', 't-d'); break;
+    case 'trash': openApp('trash'); print('opening Trash…', 't-d'); break;
+    case 'resume': openApp('resume'); print(`opening resume.log… (PDF: ${ext(ME.resume, 'Meet_Bhanushali_Resume.pdf ↗')})`, 't-d'); break;
+    case 'ratings': case 'achievements':
+      ACHV.forEach(([what, label, url]) => print(`<span class="t-y">★</span> ${esc(what)} <span class="t-d">·</span> ${ext(url, esc(label))}`));
+      break;
+    case 'contact': openApp('contact'); print('opening contact.sh…', 't-d'); break;
+    case 'books': openApp('books'); print('opening books.md…', 't-d'); break;
+    case 'tor': {
+      const steps = ['Bootstrapped 5% (conn): Connecting to a relay', 'Bootstrapped 45% (requesting_descriptors): Asking for relay descriptors', 'Bootstrapped 90% (ap_handshake_done): Handshake finished with a relay', 'Bootstrapped 100% (done): Done'];
+      for (const s of steps) { print(`<span class="t-d">[notice]</span> ${s}`); await wait(reduced ? 0 : 380); }
+      print('you ── guard (DE) ── middle (NL) ── exit (IS) ── <span class="t-h">meetkool.onion</span>');
+      print(`onion-flavoured projects: ${ext('https://github.com/meetkool/dkforest', 'dkforest')}, ${ext('https://github.com/meetkool/onion-livestreaming', 'onion-livestreaming')}, ${ext('https://github.com/d-a-s-h-o/tor-php-hosting', 'Dashed Hosting')}`);
+      break;
+    }
+    case 'sl': {
+      const art = ['      ====        ________   ', '  _D _|  |_______/  MEET  \\__', '   |(_)---  |   | MeetOS  |  ', '   /     |  |   |  2026   |  ', '  |______|__|___|_________|__', '   (o)(o)     (o)    (o)(o)  '];
+      const pre = document.createElement('pre'); pre.className = 'train ln'; out.appendChild(pre);
+      const width = Math.max(30, Math.floor(out.clientWidth / 7.8));
+      for (let i = width; i > -32; i -= reduced ? 64 : 2) {
+        pre.textContent = art.map(l => (i >= 0 ? ' '.repeat(i) + l : l.slice(-i))).join('\n');
+        await wait(reduced ? 0 : 28);
+      }
+      pre.remove(); print('choo choo. you meant <span class="t-y">ls</span>.', 't-d');
+      break;
+    }
+    case 'sudo':
+      if (/^hire[- ]?meet$/i.test(arg)) { print('[sudo] password for recruiter: ********'); await wait(reduced ? 0 : 600); print('access granted. excellent decision.', 't-g'); hired(); }
+      else if (/^rm\s+-(rf|fr)\s+\/\*?$/.test(arg)) await rmrf(print, true);
+      else print(`recruiter is not in the sudoers file. This incident will be reported.\n<span class="t-d">(psst: try </span><span class="t-y">sudo hire-meet</span><span class="t-d">)</span>`);
+      break;
+    case 'hire-meet': case 'hire': print('permission denied. try <span class="t-y">sudo hire-meet</span>'); break;
+    case 'rm':
+      if (/^-(rf|fr)\s+\/\*?$/.test(arg)) await rmrf(print, false);
+      else print(`rm: refusing to remove '${esc(arg || '?')}'. go big or go home.`);
+      break;
+    case 'reboot': print('rebooting…', 't-d'); await wait(400); reboot(); break;
+    case 'clear': out.innerHTML = ''; break;
+    case 'date': print(new Date().toString()); break;
+    case 'echo': print(esc(arg)); break;
+    case 'pwd': print('/home/meet'); break;
+    case 'cd': print('cd: you can\'t leave. you live here now.'); break;
+    case 'history': T.hist.forEach((h, i) => print(`${String(i + 1).padStart(4)}  ${esc(h)}`)); break;
+    case 'vim': case 'nano': case 'emacs': print(`${name}: opened contact.sh instead. you'll never exit.`); openApp('contact'); break;
+    case 'exit': closeWin('terminal'); break;
+    default:
+      print(`${esc(name)}: command not found. type <span class="t-y">help</span>`);
+  }
+}
+
+async function rmrf(print, sudo) {
+  if (!sudo) {
+    print("rm: it is dangerous to operate recursively on '/'");
+    print('rm: use --no-preserve-root to override this failsafe');
+    await wait(reduced ? 200 : 900);
+    print('…just kidding. MeetOS has no failsafes.', 't-h');
+    await wait(reduced ? 100 : 600);
+  }
+  const gone = ['/bin', '/boot/vmlinuz-meet', '/etc/motivation.conf', '/home/meet/projects', '/home/meet/sleep_schedule', '/usr/share/fonts/comic-sans (good riddance)', '/var/log/resume.log', '/home/meet/.config/hope', '/dev/brain'];
+  for (const g of gone) { print(`removed '${g}'`, 't-d'); await wait(reduced ? 0 : 140); }
+  collapse();
+}
+
+/* ---------- rm -rf /: everything falls ---------- */
+let physicsRAF = 0;
+function collapse() {
+  stopChaos();
+  const els = [...$$('#wins .win:not([hidden])'), ...$$('.icon'), $('.hoodie'), $('.wall-name'), $('#taskbar')];
+  const bodies = els.map(el => {
+    const r = el.getBoundingClientRect();
+    el.dataset.fallen = '1';
+    return { el, r, x: 0, y: 0, a: 0, vx: (Math.random() - .5) * 7, vy: -2 - Math.random() * 6, va: (Math.random() - .5) * 7 };
+  });
+  const floor = innerHeight;
+  const step = () => {
+    bodies.forEach(b => {
+      b.vy += .9; b.x += b.vx; b.y += b.vy; b.a += b.va;
+      const maxY = floor - b.r.bottom;
+      if (b.y > maxY) { b.y = maxY; b.vy *= -.36; b.vx *= .72; b.va *= .55; }
+      if (b.r.left + b.x < 0 || b.r.right + b.x > innerWidth) { b.vx *= -.8; b.x = Math.max(-b.r.left, Math.min(innerWidth - b.r.right, b.x)); }
+      b.el.style.transform = `translate(${b.x}px, ${b.y}px) rotate(${b.a}deg)`;
+    });
+    physicsRAF = requestAnimationFrame(step);
+  };
+  if (reduced) bodies.forEach(b => { b.el.style.transform = `translateY(${floor - b.r.bottom}px)`; });
+  else physicsRAF = requestAnimationFrame(step);
+  setTimeout(() => { document.body.classList.add('glitch'); }, reduced ? 600 : 2800);
+  setTimeout(panic, reduced ? 1000 : 3500);
+}
+
+function panic() {
+  cancelAnimationFrame(physicsRAF);
+  document.body.classList.remove('glitch');
+  const p = $('#panic'), txt = $('#panic-text');
+  const lines = [
+    '<span class="inv">Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000d06</span>',
+    '',
+    'CPU: 0 PID: 1 Comm: rm Tainted: G    C        6.20.26-crazy #1',
+    'Hardware name: Meet Bhanushali/IIIT-Lucknow, BIOS MeetBIOS 20.26 ' + todayBios(),
+    'Call Trace:',
+    ' &lt;TASK&gt;',
+    ' dump_stack_lvl+0x48/0x70',
+    ' panic+0x1a0/0x3b0',
+    ' do_exit+0xbad/0xc0de',
+    ' portfolio_unlink_everything+0x1337/0x2026',
+    ' __x64_sys_rm_rf_root+0x42/0x42',
+    ' do_syscall_64+0x5b/0x80',
+    ' &lt;/TASK&gt;',
+    'Kernel Offset: disabled',
+    '---[ end Kernel panic - not syncing: someone typed rm -rf / on a portfolio ]---',
+    '',
+    '<span id="panic-count">Rebooting in 6 seconds…</span> press any key or tap to reboot now.'
+  ];
+  txt.innerHTML = lines.join('\n');
+  p.hidden = false;
+  let n = 6, done = false;
+  const go = () => { if (done) return; done = true; clearInterval(iv); removeEventListener('keydown', go); p.removeEventListener('click', go); p.hidden = true; reboot(); };
+  const iv = setInterval(() => { n--; const c = $('#panic-count'); if (c) c.textContent = `Rebooting in ${n} second${n === 1 ? '' : 's'}…`; if (n <= 0) go(); }, 1000);
+  setTimeout(() => { addEventListener('keydown', go); p.addEventListener('click', go); }, 400);
+}
+
+function resetDesktop() {
+  cancelAnimationFrame(physicsRAF);
+  stopChaos();
+  landNow();
+  document.body.classList.remove('glitch');
+  $$('[data-fallen]').forEach(el => { el.style.transform = ''; delete el.dataset.fallen; });
+  [...wins.keys()].forEach(closeWin);
+  cascade = 0;
+}
+
+function reboot() { resetDesktop(); boot(true); }
+
+/* ---------- chaos mode ---------- */
+let chaos = null;
+function startChaos() {
+  if (chaos) return;
+  ['about', 'projects', 'services', 'contact', 'books', 'resume'].forEach(id => openApp(id));
+  document.body.classList.add('chaos');
+  $('#chaos-banner').hidden = false;
+  void winsEl.offsetWidth;
+  const area = winsEl.getBoundingClientRect();
+  const items = $$('#wins .win:not([hidden])').map(el => {
+    const r = el.getBoundingClientRect();
+    const sp = reduced ? 1 : 2.2 + Math.random() * 3.5;
+    const a = Math.random() * Math.PI * 2;
+    return { el, x0: r.left - area.left, y0: r.top - area.top, x: r.left - area.left, y: r.top - area.top, w: r.width, h: r.height, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp };
+  });
+  const step = () => {
+    const W = winsEl.clientWidth, H = winsEl.clientHeight;
+    items.forEach(it => {
+      it.x += it.vx; it.y += it.vy;
+      if (it.x < 0 || it.x + it.w > W) { it.vx *= -1; it.x = Math.max(0, Math.min(W - it.w, it.x)); }
+      if (it.y < 0 || it.y + it.h > H) { it.vy *= -1; it.y = Math.max(0, Math.min(H - it.h, it.y)); }
+      it.el.style.transform = `translate(${it.x - it.x0}px, ${it.y - it.y0}px)`;
+    });
+    chaos.raf = requestAnimationFrame(step);
+  };
+  const title = document.title;
+  chaos = { items, title, raf: requestAnimationFrame(step) };
+  if (!reduced) {
+    chaos.rain = setInterval(() => {
+      const img = document.createElement('img');
+      img.src = 'images/logo.png'; img.alt = ''; img.className = 'rain';
+      img.style.left = Math.random() * (innerWidth - 40) + 'px';
+      img.addEventListener('animationend', () => img.remove());
+      document.body.appendChild(img);
+    }, 220);
+    let t = 0;
+    chaos.flick = setInterval(() => { document.title = (t++ % 2) ? '★ CHAOS ★' : title; }, 600);
+  }
+}
+function stopChaos() {
+  if (!chaos) return;
+  cancelAnimationFrame(chaos.raf); clearInterval(chaos.rain); clearInterval(chaos.flick);
+  document.title = chaos.title;
+  chaos.items.forEach(it => { it.el.style.transform = ''; });
+  $$('.rain').forEach(n => n.remove());
+  document.body.classList.remove('chaos');
+  $('#chaos-banner').hidden = true;
+  chaos = null;
+}
+$('#chaos-banner').addEventListener('click', stopChaos);
+
+/* ---------- launch to space ---------- */
+let spaceRAF = 0;
+function launch() {
+  if (!$('#space').hidden) return;
+  stopChaos(); closeStart();
+  const sp = $('#space'), cv = $('#stars'), rocket = $('#rocket'), alt = $('#alt'), layer = $('#layer'), msg = $('#space-msg');
+  sp.hidden = false; msg.hidden = true;
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+  const c = cv.getContext('2d'); c.scale(dpr, dpr);
+  const stars = Array.from({ length: 180 }, () => ({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, s: Math.random() * 1.8 + .3 }));
+  $('#desk').classList.add('sink'); $('#taskbar').classList.add('sink');
+  rocket.style.transition = 'none'; rocket.style.bottom = '-170px';
+  void rocket.offsetWidth;
+  rocket.style.transition = '';
+  requestAnimationFrame(() => { rocket.style.bottom = 'calc(50% - 62px)'; });
+  const t0 = performance.now(), dur = reduced ? 400 : 5600;
+  const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  const sky = [20, 157, 204], space = [3, 4, 14];
+  const frame = now => {
+    const t = Math.min(1, (now - t0) / dur);
+    const km = 100 * t * t;
+    const col = mix(sky, space, Math.min(1, km / 80));
+    c.clearRect(0, 0, innerWidth, innerHeight);
+    c.fillStyle = `rgba(${col.join(',')},${Math.min(1, km / 1.2 + t * 4)})`;
+    c.fillRect(0, 0, innerWidth, innerHeight);
+    c.fillStyle = `rgba(255,255,255,${Math.min(1, km / 60)})`;
+    const v = 1 + km / 6;
+    stars.forEach(s => { s.y += v * s.s * .6; if (s.y > innerHeight) { s.y = -2; s.x = Math.random() * innerWidth; } c.fillRect(s.x, s.y, s.s, s.s + Math.min(14, v * .5)); });
+    alt.firstChild.nodeValue = km.toFixed(1) + ' km';
+    layer.textContent = km < 12 ? 'troposphere' : km < 50 ? 'stratosphere' : km < 85 ? 'mesosphere' : km < 100 ? 'thermosphere' : 'space · Kármán line';
+    if (t >= 1 && msg.hidden) { msg.hidden = false; $('#land').focus(); }
+    spaceRAF = requestAnimationFrame(frame);
+  };
+  spaceRAF = requestAnimationFrame(frame);
+}
+function landNow() {
+  cancelAnimationFrame(spaceRAF);
+  $('#space').hidden = true;
+  $('#desk').classList.remove('sink'); $('#taskbar').classList.remove('sink');
+}
+$('#land').addEventListener('click', landNow);
+
+/* ---------- confetti + hire ---------- */
+function confetti() {
+  if (reduced) return;
+  const cv = $('#fx'), dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cols = ['#149dcc', '#ff00a2', '#f1f0fa', '#ffd479', '#55ff55'];
+  const ps = Array.from({ length: 170 }, () => ({ x: innerWidth / 2 + (Math.random() - .5) * 120, y: innerHeight * .62, vx: (Math.random() - .5) * 17, vy: -6 - Math.random() * 14, s: 5 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - .5) * .4, c: cols[Math.random() * cols.length | 0] }));
+  const t0 = performance.now();
+  const f = now => {
+    c.clearRect(0, 0, innerWidth, innerHeight);
+    ps.forEach(p => { p.vy += .38; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr; c.save(); c.translate(p.x, p.y); c.rotate(p.r); c.fillStyle = p.c; c.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); c.restore(); });
+    if (now - t0 < 3200) requestAnimationFrame(f); else c.clearRect(0, 0, innerWidth, innerHeight);
+  };
+  requestAnimationFrame(f);
+}
+function hired() {
+  closeWin('hire');
+  openApp('contact');
+  confetti();
+  if (T) T.print('hire-meet: success. contact.sh is open. 🚀', 't-g');
+}
+
+/* ---------- global keys ---------- */
+const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+let kpos = 0;
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (chaos) stopChaos(); else if (!startMenu.hidden) { closeStart(); startBtn.focus(); } else if (!$('#space').hidden && !$('#space-msg').hidden) landNow(); }
+  kpos = (e.key === KONAMI[kpos] || e.key.toLowerCase() === KONAMI[kpos]) ? kpos + 1 : (e.key === KONAMI[0] ? 1 : 0);
+  if (kpos === KONAMI.length) { kpos = 0; startChaos(); }
+});
+
+/* ---------- boot ---------- */
+function todayBios() { const d = new Date(); return [d.getMonth() + 1, d.getDate()].map(n => String(n).padStart(2, '0')).join('/') + '/' + d.getFullYear(); }
+
+let skipping = false;
+const bwait = ms => skipping ? Promise.resolve() : wait(ms);
+
+async function boot(full) {
+  const bootEl = $('#boot'), text = $('#boot-text'), grub = $('#grub');
+  skipping = false;
+  bootEl.hidden = false; bootEl.classList.remove('out'); grub.hidden = true; text.textContent = ''; text.hidden = false;
+  const add = (html = '') => { text.insertAdjacentHTML('beforeend', html + '\n'); };
+  const fast = reduced || !full;
+
+  if (full && !reduced) {
+    /* POST */
+    add('<span class="b-hi">MeetBIOS v20.26</span>  (C) 2021-2026 Bhanushali Megatrends, Inc.');
+    add('MEETKOOL-2026 ACPI BIOS Revision 1003');
+    add(''); await bwait(300);
+    add('Main Processor : <span class="b-hi">Brain(TM) Dual-Core @ 4.20GHz</span>, chai-cooled');
+    text.insertAdjacentHTML('beforeend', 'Memory Testing : <span id="memt">0</span>K');
+    const memt = $('#memt');
+    for (let k = 0; k <= 65536; k += 4096) { memt.textContent = k; await bwait(28); }
+    memt.textContent = 65536; add(' <span class="b-g">OK</span>');
+    add(''); await bwait(200);
+    const dev = [['Primary Master  ', 'IIIT-LUCKNOW B.TECH CS 2021-2025'], ['Primary Slave   ', 'ARDUCOPTER FLIGHT CONTROLLER'], ['Secondary Master', 'TOR ONION ROUTER (3 hops)'], ['Secondary Slave ', 'None (still looking for a co-founder)']];
+    for (const [k, v] of dev) { add(`Detecting IDE ${k} ... <span class="b-c">${v}</span>`); await bwait(230); }
+    add('');
+    add('Press <span class="b-y">DEL</span> to enter SETUP, <span class="b-y">ESC</span> to skip boot');
+    add(todayBios() + '-MEET-2026-OS-x86_64');
+    await bwait(900);
+
+    /* GRUB */
+    text.hidden = true; grub.hidden = false;
+    const entries = [
+      { label: 'MeetOS 2026 (crazy mode)' },
+      { label: 'MeetOS 2026 (recovery mode: the 2022 portfolio)', href: CLASSIC_URL },
+      { label: 'Memory test (memtest86+)', memtest: true }
+    ];
+    const list = $('#grub-list'), help = $('#grub-help');
+    list.innerHTML = entries.map((e, i) => e.href
+      ? `<a class="entry" href="${e.href}" target="_blank" rel="noopener" data-i="${i}">${esc(e.label)}</a>`
+      : `<button class="entry" type="button" data-i="${i}">${esc(e.label)}</button>`).join('');
+    let sel = 0, left = 4, picked = null, counting = true;
+    const draw = () => {
+      $$('.entry', list).forEach((b, i) => b.classList.toggle('sel', i === sel));
+      help.textContent = 'Use the ↑ and ↓ keys to select which entry is highlighted.\nPress enter to boot the selected OS.' + (counting ? `\nThe highlighted entry will be executed automatically in ${left}s.` : '');
+    };
+    draw();
+    picked = await new Promise(resolve => {
+      const done = i => { clearInterval(iv); removeEventListener('keydown', onKey); list.removeEventListener('click', onClick); resolve(i); };
+      const onKey = e => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); counting = false; sel = (sel + (e.key === 'ArrowDown' ? 1 : entries.length - 1)) % entries.length; draw(); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (entries[sel].href) list.children[sel].click(); else done(sel); }
+      };
+      const onClick = e => { const b = e.target.closest('[data-i]'); if (!b) return; sel = +b.dataset.i; draw(); if (!entries[sel].href) done(sel); };
+      const iv = setInterval(() => { if (skipping) return done(0); if (!counting) return; left--; draw(); if (left <= 0) done(sel); }, 1000);
+      addEventListener('keydown', onKey);
+      list.addEventListener('click', onClick);
+      bootEl._skipGrub = () => done(0);
+      if (skipping) done(0);
+    });
+    bootEl._skipGrub = null;
+    grub.hidden = true; text.hidden = false; text.textContent = '';
+    if (entries[picked].memtest) {
+      add('<span class="b-hi">Memtest86+ v7.20-meet</span>');
+      add('Pass 1 of 1 ........................ <span class="b-g">100%</span>');
+      add('Errors: 0   Bugs in portfolio code: <span class="b-y">classified</span>');
+      add(''); await bwait(1400); text.textContent = '';
+    }
+  }
+
+  /* kernel log */
+  const klog = [
+    '[    0.000000] meetkernel 6.20.26-crazy (meet@nardcart) #1 SMP PREEMPT_CHAOS',
+    '[    0.000420] Command line: BOOT_IMAGE=/vmlinuz-meet root=/dev/brain ro quiet splash chaos=1',
+    '[    0.013370] x86/fpu: Supporting XSAVE feature 0x001: \'chai registers\'',
+    '[    0.104200] ACPI: Core revision ' + new Date().toISOString().slice(0, 10).replace(/-/g, ''),
+    '[    0.210011] usb 1-1: new device: ArduCopter flight controller (hardware lead mode)',
+    '[    0.333333] tor: Bootstrapped 100% (done): Done',
+    '[    0.404404] EXT4-fs (iiitl0): mounted filesystem /education (2021-2025, read-only)',
+    '[    0.512000] docker0: port 1(kubernetes) entered forwarding state',
+    '<span class="b-g">[  OK  ]</span> Started <span class="b-hi">Engineering Lead Service</span> (TDF - Diamonds &amp; Gold, 6 apps).',
+    '<span class="b-g">[  OK  ]</span> Started <span class="b-hi">Agent Router</span> (Cyoni: 20 MCP servers, 48 tools).',
+    '<span class="b-g">[  OK  ]</span> Started <span class="b-hi">DevOps Daemon</span>.',
+    '<span class="b-g">[  OK  ]</span> Started <span class="b-hi">Blockchain Node</span> (sync: 99.9%).',
+    '<span class="b-y">[ WAIT ]</span> A start job is running for Reach Space (2021 / ∞)',
+    '<span class="b-g">[  OK  ]</span> Reached target <span class="b-hi">MeetOS Desktop</span>.'
+  ];
+  for (const l of klog) { add(l); await bwait(fast ? 12 : 120); }
+  await bwait(fast ? 80 : 450);
+  bootEl.classList.add('out');
+  await wait(fast ? 120 : 350);
+  bootEl.hidden = true;
+  ss.set('meetos-booted', '1');
+  startDesktop();
+}
+
+function skipBoot() {
+  skipping = true;
+  const b = $('#boot');
+  if (b._skipGrub) b._skipGrub();
+}
+$('#skip').addEventListener('click', skipBoot);
+addEventListener('keydown', e => { if (!$('#boot').hidden && (e.key === 'Escape' || (e.key === 'Delete' && $('#grub').hidden))) skipBoot(); });
+
+let hireTimer = 0;
+function startDesktop() {
+  const W = winsEl.clientWidth;
+  openApp('terminal', { at: () => [214, 26] });
+  if (!narrow() && W >= 1000) openApp('about', { at: (W, H, w) => [Math.max(214 + 580 + 24, W - w - 48), 72] });
+  focusWin('terminal');
+  if (T) T.auto('neofetch').then(() => T && T.print('type <span class="t-y">help</span>, or tap a command below.', 't-d'));
+  clearTimeout(hireTimer);
+  if (!ss.get('meetos-hire')) hireTimer = setTimeout(() => { if (!chaos && $('#space').hidden && $('#panic').hidden && $('#boot').hidden) { ss.set('meetos-hire', '1'); openApp('hire'); } }, 14000);
+}
+
+boot(!ss.get('meetos-booted'));
+})();
+</script>
 </html>
