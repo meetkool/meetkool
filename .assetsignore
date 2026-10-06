@@ -1,0 +1,9 @@
+# files in the repo that are not part of the website
+.git
+node_modules
+.wrangler
+wrangler.jsonc
+package.json
+vercel.json
+bun.lock
+bun.lockb
