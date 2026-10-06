@@ -1,0 +1,12 @@
+// Cloudflare Workers config: serves this repo as a static site.
+// "name" must match the Worker that Workers Builds is connected to.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "meetkool",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./"
+  },
+  // needed by `wrangler preview`, which Workers Builds runs for non-production branches
+  "previews": {}
+}
