@@ -1,0 +1,8 @@
+{
+  "name": "meetkool-portfolio",
+  "private": true,
+  "description": "MeetOS 2026, a static portfolio. Nothing to install or build; this file only pins the Node.js version Vercel uses.",
+  "engines": {
+    "node": "24.x"
+  }
+}
