@@ -388,3 +388,41 @@ Code paths that exist but never trigger in the shipped build:
   keyframe cadence, and the server-side name filter.
 - Online behaviour (latency, real player mixes) was not captured. Only `/status` was
   queried; no online session was joined.
+
+## 13. Live session (15 Oct 2026) [R]
+
+One automated client (`tools/online.js`) joined the public server for 117 s. It played as a
+protester for 64 s, then switched to police with `T`. A phone-sized practice run
+(`tools/phone.js`) tested the touch controls. The raw capture holds other players' names, so
+it is not committed. Screenshots have the leaderboard and feed blurred (`tools/blur.py`).
+
+- **Transport:** a plain WebSocket at `wss://mantarjantar.com/ws`, not Socket.IO.
+  - Up: 3,488 `in` messages (29.8/s, ~95 B each, ~2.7 KB/s).
+  - Down: 1 keyframe (1,975 B) and 1,746 delta snapshots (14.9/s, median 382 B, max 2.6 KB,
+    ~6.0 KB/s).
+  - The server sends every second tick, so snapshots arrive every 66 ms at the median.
+  - Ping from the cloud machine was 190 ms at the median, and interpolation delay ranged
+    3.2–6.2 ticks.
+  - Predicted position led the last server position by ~31 units at the median, and the
+    visible correction stayed under 5 px for 90% of samples.
+- **Room:** round 52, win target 788 power, 302 distinct bodies seen, 32 of them humans.
+  `/status` showed 303–320 players in 11 rooms across the session.
+- **What happened to the test player:** detained twice in the first minute (carried →
+  escorted → bus for 9–12 s → released at a far drop-off such as Bawana PS).
+- **Measured speeds while moving (median / p90):**
+
+  | Who | Median | p90 |
+  |---|---|---|
+  | Police | 126 | 205 |
+  | Marching protesters | 136 | 190 |
+  | Human players | 135 | 171 |
+  | Scared NPCs (sprint) | 148 | 249 |
+  | TV crews | 176 | 240 |
+  | Idle bystanders | 34 | 48 |
+
+  These are consistent with the code's base values: 150, ×1.45 sprint, 45 idle.
+- **Tear gas:** 80 shells seen. The cloud radius was 150 for human-thrown shells and 115 for
+  NPC-thrown shells, as in `updateCans`.
+- **Phone:** a floating joystick moved the protester at 159 units/s (150 × 1.06). Only the
+  NAARA button shows for protesters; LATHI and GAS show for police. LIFT and DASH stay hidden.
+- **Payments:** none. There is no shop, currency or purchase flow in the code or the traffic.
