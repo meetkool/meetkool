@@ -426,3 +426,22 @@ it is not committed. Screenshots have the leaderboard and feed blurred (`tools/b
 - **Phone:** a floating joystick moved the protester at 159 units/s (150 × 1.06). Only the
   NAARA button shows for protesters; LATHI and GAS show for police. LIFT and DASH stay hidden.
 - **Payments:** none. There is no shop, currency or purchase flow in the code or the traffic.
+
+## 14. Our own server
+
+`server/` is a from-scratch Node server for the unmodified client. It runs the game's shared
+`sim.js` (one instance per room, 30 Hz) and speaks the protocol from §2.1: deflate-raw
+snapshots, with the previous snapshot as the dictionary, at 15 Hz.
+
+It answers each unknown in §12 with its own policy:
+- **Rooms:** fill the fullest room up to 32 humans, then open a new room.
+- **Connections:** 4 sockets per IP.
+- **Idle:** warn at 90 s, kick with close code 4000 at 115 s.
+- **Resume:** a 22 s window.
+- **Keyframes:** on request and every 30 s.
+- **Full server:** a queue, then `full` with close code 1013.
+- **Names:** cleaned before use.
+
+These are our choices, not the live server's. `npm test` runs 7 end-to-end protocol tests,
+decoding snapshots with the client's own fflate. A two-browser Chromium session also played
+together on it, and a page reload resumed the same body. See `server/README.md`.

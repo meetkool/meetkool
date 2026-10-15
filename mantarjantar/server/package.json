@@ -1,0 +1,14 @@
+{
+  "name": "jantar-mantar-local-server",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Our own server for the Jantar Mantar Chalo client: rooms, WebSocket protocol, snapshots. Runs the game's shared sim.js locally.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "fetch-client": "node fetch-client.js",
+    "test": "node --test test/protocol.test.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "8.18.0" }
+}
