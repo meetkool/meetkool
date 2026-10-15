@@ -7,3 +7,6 @@ package.json
 vercel.json
 bun.lock
 bun.lockb
+.mcp.json
+.claude
+.vercelignore
